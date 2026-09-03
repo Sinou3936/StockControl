@@ -6,7 +6,7 @@
 
 **Architecture:** Drift가 테이블 클래스로부터 데이터 클래스를 자동 생성하므로 (`Ingredients`→`Ingredient`, `Lots`→`Lot` 등), 별도의 손으로 작성한 도메인 데이터 클래스는 만들지 않는다. `lib/domain/`에는 순수 로직(enum, 단위 환산 함수)만 둔다. Supplier/Ingredient는 단순 CRUD이므로 리포지토리 레이어 없이 DAO를 Riverpod provider로 직접 노출한다. Lot 생성은 Lot + StockMovement를 하나의 트랜잭션으로 묶는 실제 로직이 있으므로 `LotRepository`를 둔다. 입고 폼의 상태는 화면 하나에서만 쓰이는 일시적 UI 상태이므로 전역 provider 대신 `ConsumerStatefulWidget`의 로컬 State로 관리한다.
 
-**Tech Stack:** Flutter, Drift (SQLite ORM), sqlite3_flutter_libs, path_provider, flutter_riverpod
+**Tech Stack:** Flutter, Drift (SQLite ORM), drift_flutter, flutter_riverpod
 
 ---
 
@@ -25,13 +25,15 @@ Drift는 `@DriftDatabase`/`@DriftAccessor` 어노테이션이 붙은 클래스�
 **Files:**
 - Modify: `pubspec.yaml`
 
+> **실행 중 발견한 변경사항**: `sqlite3_flutter_libs`는 pub.dev에서 `+eol` 태그가 붙어 있으며, drift 2.32+ / sqlite3 3.x부터는 build hooks로 SQLite가 자동 번들되어 더 이상 직접 의존할 필요가 없다. 대신 drift 공식 문서가 권장하는 `drift_flutter` 패키지의 `driftDatabase()` 헬퍼를 사용한다 — `path`/`path_provider`를 직접 다룰 필요도 없어진다.
+
 - [ ] **Step 1: 런타임 의존성 추가**
 
 Run:
 ```bash
-flutter pub add drift path path_provider sqlite3_flutter_libs flutter_riverpod
+flutter pub add drift flutter_riverpod drift_flutter
 ```
-Expected: `pubspec.yaml`의 `dependencies:`에 다섯 패키지가 추가되고 `flutter pub get`이 자동 실행되어 성공 메시지가 뜬다.
+Expected: `pubspec.yaml`의 `dependencies:`에 세 패키지가 추가되고 `flutter pub get`이 자동 실행되어 성공 메시지가 뜬다.
 
 - [ ] **Step 2: 개발 의존성 추가**
 
@@ -299,14 +301,12 @@ class StockMovements extends Table {
 
 - [ ] **Step 5: AppDatabase 클래스 작성 (DAO는 다음 태스크에서 채움)**
 
+`drift_flutter`의 `driftDatabase()`가 플랫폼에 맞는 파일 경로/커넥션을 알아서 구성해주므로, `path_provider`를 직접 다루지 않는다. 테스트에서는 생성자의 선택적 `QueryExecutor` 인자로 인메모리 DB를 주입한다.
+
 `lib/data/local/database.dart`:
 ```dart
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:drift_flutter/drift_flutter.dart';
 
 import 'tables/ingredients_table.dart';
 import 'tables/lots_table.dart';
@@ -319,20 +319,11 @@ part 'database.g.dart';
   tables: [Suppliers, Ingredients, Lots, StockMovements],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
-
-  AppDatabase.forTesting(QueryExecutor executor) : super(executor);
+  AppDatabase([QueryExecutor? executor])
+      : super(executor ?? driftDatabase(name: 'stockcontrol'));
 
   @override
   int get schemaVersion => 1;
-}
-
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dir.path, 'stockcontrol.sqlite'));
-    return NativeDatabase.createInBackground(file);
-  });
 }
 ```
 
@@ -484,15 +475,13 @@ part 'database.g.dart';
   daos: [SupplierDao, IngredientDao, LotDao, StockMovementDao],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
-
-  AppDatabase.forTesting(QueryExecutor executor) : super(executor);
+  AppDatabase([QueryExecutor? executor])
+      : super(executor ?? driftDatabase(name: 'stockcontrol'));
 
   @override
   int get schemaVersion => 1;
 }
 ```
-(파일의 나머지 부분 `_openConnection()`은 그대로 둔다)
 
 - [ ] **Step 6: 코드젠 실행**
 
@@ -511,7 +500,7 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory());
   });
 
   tearDown(() => db.close());
@@ -541,7 +530,7 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory());
   });
 
   tearDown(() => db.close());
@@ -579,7 +568,7 @@ void main() {
   late int ingredientId;
 
   setUp(() async {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory());
     ingredientId = await db.ingredientDao.insertIngredient(
       IngredientsCompanion.insert(
         name: '양파',
@@ -625,7 +614,7 @@ void main() {
   late int lotId;
 
   setUp(() async {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory());
     ingredientId = await db.ingredientDao.insertIngredient(
       IngredientsCompanion.insert(
         name: '양파',
@@ -701,7 +690,7 @@ void main() {
   late int ingredientId;
 
   setUp(() async {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory());
     repository = LotRepository(db);
     ingredientId = await db.ingredientDao.insertIngredient(
       IngredientsCompanion.insert(
@@ -1180,7 +1169,7 @@ import 'package:stockcontrol/features/inbound/inbound_form_screen.dart';
 void main() {
   testWidgets('shows validation errors when required fields are empty',
       (tester) async {
-    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await tester.pumpWidget(
