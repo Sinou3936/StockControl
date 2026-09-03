@@ -1185,6 +1185,12 @@ void main() {
 
     expect(find.text('수량을 입력하세요'), findsOneWidget);
     expect(find.text('단가를 입력하세요'), findsOneWidget);
+
+    // Drift의 watch() 스트림이 구독 취소 시 예약하는 정리용 타이머(0초 지연)가
+    // 테스트 종료 시점까지 남아있지 않도록, 위젯을 교체해 dispose를 유도한 뒤
+    // duration을 준 pump()로 가짜 시계를 흘려보내 그 타이머를 실행시킨다.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
   });
 }
 ```
