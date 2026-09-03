@@ -1499,7 +1499,11 @@ class HomeScreen extends StatelessWidget {
 Run: `flutter test`
 Expected: PASS — 지금까지 작성한 모든 테스트(도메인 3개, DAO 4개, 리포지토리 2개, 위젯 1개)가 통과
 
-- [ ] **Step 4: Windows 데스크톱에서 수동 확인**
+- [ ] **Step 4: Windows 데스크톱에서 수동 확인 (Visual Studio 설치 후 진행)**
+
+`flutter doctor`에서 `Visual Studio - develop Windows apps`가 X로 나옴(C++ 워크로드 미설치) — `flutter run -d windows`가 이 상태로는 빌드되지 않는다. 임시로 `flutter run -d chrome`으로 확인을 시도했으나, `driftDatabase()`가 웹 컴파일 시 별도의 `web:` 파라미터(WASM sqlite3 + 워커 설정)를 요구하는 걸 발견했다 — `Invalid argument(s): When compiling to the web, the 'web' parameter needs to be set.` 웹은 애초에 지원 대상이 아니므로 이 설정은 추가하지 않기로 함. Visual Studio 설치는 사용자가 편할 때 진행하기로 하고, 그 전까지 이 단계는 보류.
+
+Visual Studio(Desktop development with C++) 설치 후:
 
 Run: `flutter run -d windows`
 
