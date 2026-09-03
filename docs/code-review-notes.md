@@ -515,3 +515,85 @@ final lotRepositoryProvider = Provider<LotRepository>((ref) {
 ```
 
 `database_provider.dart`와 같은 모양(명시적 타입 + 블록 바디)이지만, 이미 있는 getter를 꺼내는 `dao_providers.dart`와 달리 **`LotRepository` 생성자를 직접 호출**해 새 인스턴스를 만든다. Spring의 생성자 주입(`@Bean public LotRepository lotRepository(AppDatabase db) { return new LotRepository(db); }`)과 같은 개념. 이걸로 Task 8(provider 3개 파일) 완료.
+
+---
+
+## `lib/features/supplier_management/supplier_list_screen.dart`
+
+```dart
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/dao_providers.dart';
+import '../../data/local/daos/supplier_dao.dart';
+import '../../data/local/database.dart';
+
+class SupplierListScreen extends ConsumerWidget {
+  const SupplierListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dao = ref.watch(supplierDaoProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('거래처 관리')),
+      body: StreamBuilder<List<Supplier>>(
+        stream: dao.watchAll(),
+        builder: (context, snapshot) {
+          final suppliers = snapshot.data ?? [];
+          return ListView.builder(
+            itemCount: suppliers.length,
+            itemBuilder: (context, index) {
+              final supplier = suppliers[index];
+              return ListTile(
+                title: Text(supplier.name),
+                subtitle:
+                    supplier.contact != null ? Text(supplier.contact!) : null,
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddDialog(context, dao),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Future<void> _showAddDialog(BuildContext context, SupplierDao dao) async {
+    // ... TextEditingController 2개 + AlertDialog, 저장 시 dao.insertSupplier() 호출
+  }
+}
+```
+
+**첫 UI 화면 리뷰. 새 개념 4가지:**
+
+1. **`ConsumerWidget`** — 일반 `StatelessWidget`의 `build(BuildContext context)`와 달리 `build(BuildContext context, WidgetRef ref)`처럼 `ref`를 추가로 받는 Riverpod 버전. `ref.watch(provider)`로 provider를 구독하려면 이 `ref`가 필요하다. "Riverpod을 쓸 수 있는 StatelessWidget."
+
+2. **`StreamBuilder<List<Supplier>>`** — Flutter 기본 위젯. "이 스트림에서 새 데이터가 나올 때마다 화면을 다시 그려라." `dao.watchAll()`(거래처 목록이 바뀔 때마다 흘려보내는 스트림)을 구독한다. `snapshot.data`는 스트림이 아직 한 번도 값을 안 보냈으면(로딩 중) `null`이라 `?? []`로 기본값 처리.
+
+3. **`ListView.builder`** — `itemCount`만큼 `itemBuilder`를 필요할 때(스크롤해서 보일 때)만 호출. 화면에 보이는 것만 그려서 목록이 길어져도 성능 유지.
+
+4. **`context.mounted` 체크** — `await dao.insertSupplier(...)`로 시간이 걸리는 동안 사용자가 이미 화면을 벗어났을 수 있다. 그 상태에서 무효해진 `context`로 `Navigator.of(context)`를 부르면 에러 위험이 있어서, `if (context.mounted)`로 먼저 확인하는 게 Flutter 표준 안전장치 (린터가 빠뜨리면 경고).
+
+**발견한 버그**: `SupplierDao` 타입을 파라미터로 쓰면서 그 클래스가 정의된 `daos/supplier_dao.dart` import를 빠뜨렸었다. `flutter analyze`가 바로 잡아줘서 수정 (계획 문서에도 반영).
+
+---
+
+## `lib/features/ingredient_management/ingredient_list_screen.dart`
+
+`supplier_list_screen.dart`와 거의 같은 구조(`ConsumerWidget`, `StreamBuilder`, `context.mounted`)이고, 새 개념은 **`StatefulBuilder`** 하나.
+
+**왜 필요한가**: 거래처 다이얼로그는 텍스트필드뿐이라 다시 그려야 할 상태가 없었지만, 여기는 드롭다운(`selectedBaseUnit`)과 체크박스(`isExpiryTracked`)가 있어서 선택이 바뀔 때마다 UI를 다시 그려야 한다. `_showAddDialog`는 `ConsumerWidget`(상태 없는 위젯) 안의 평범한 메서드라 자체 `setState`가 없다.
+
+```dart
+builder: (context, setState) => AlertDialog(...)
+```
+
+`StatefulBuilder`는 "이 부분만 자기만의 `setState`를 가진 미니 위젯으로 만들어주는" 도구. 그 `setState`는 이 다이얼로그 안의 UI만 다시 그린다(화면 전체 아님). 화면 클래스 전체를 `StatefulWidget`으로 바꾸지 않고, 다이얼로그 부분만 국소적으로 상태를 갖게 하는 방법.
+
+**참고**: `IngredientsCompanion.insert(...)`에서 `category`/`safetyStockQty`는 아예 언급도 안 함 — nullable 컬럼에 입력받는 UI가 없으면 `Value(...)`로 감쌀 필요도 없이 그냥 생략하면 "비어있음" 처리된다. (`LotRepository`의 `Value(supplierId)`는 "명시적으로 null을 넣고 싶을 때"였고, 이건 "이 필드에 아무 의견 없음"인 경우로 다름.)
+
+**발견한 실수**: 처음에 `import 'package:drift/drift.dart' show Value;`를 넣었는데, 이 화면은 `Value(...)`를 안 써서 `flutter analyze`가 unused_import 경고를 냄 — 제거해서 수정 (계획 문서에도 반영).

@@ -898,6 +898,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/dao_providers.dart';
+import '../../data/local/daos/supplier_dao.dart';
 import '../../data/local/database.dart';
 
 class SupplierListScreen extends ConsumerWidget {
@@ -1006,11 +1007,11 @@ git commit -m "feat: add supplier management screen"
 
 `lib/features/ingredient_management/ingredient_list_screen.dart`:
 ```dart
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/dao_providers.dart';
+import '../../data/local/daos/ingredient_dao.dart';
 import '../../data/local/database.dart';
 import '../../domain/base_unit.dart';
 
