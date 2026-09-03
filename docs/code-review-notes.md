@@ -438,3 +438,80 @@ SupplierDao(AppDatabase db) : super(db);
 `await`은 "이 Future가 끝날 때까지 기다렸다가 끝나면 진짜 값을 꺼내줘"라는 뜻(C#의 `await task`와 동일). `await` 없이 받으면 `int`가 아니라 아직 안 끝났을 수도 있는 `Future<int>` 객체 자체가 온다.
 
 **최종 확인된 이해**: "작업은 즉시 시작되고, 완료된 후 결과를 나중에 받는다" — 정확함.
+
+---
+
+## `lib/core/providers/database_provider.dart` — Riverpod 첫 등장
+
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/local/database.dart';
+
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  final db = AppDatabase();
+  ref.onDispose(db.close);
+  return db;
+});
+```
+
+**Spring 비유**: `Provider<AppDatabase>`는 Spring의 `@Bean` 정의와 거의 같다.
+
+```java
+@Configuration
+public class AppConfig {
+    @Bean(destroyMethod = "close")
+    public AppDatabase appDatabase() {
+        return new AppDatabase();
+    }
+}
+```
+
+- `appDatabaseProvider`는 `AppDatabase` 자체가 아니라 "어떻게 만들지에 대한 레시피". `ref.watch(appDatabaseProvider)`가 처음 호출될 때 콜백이 **딱 한 번** 실행되고 결과가 캐싱된다. 이후 누가 몇 번을 요청하든 같은 인스턴스를 돌려준다 — Spring 싱글톤 빈과 동일.
+- `ref` — Riverpod이 콜백 안에서 쓰라고 주는 컨텍스트. Spring의 `ApplicationContext`에 대응.
+- `ref.onDispose(db.close)` — provider가 정리될 때(앱 종료, 테스트의 `ProviderScope` 정리 시) `db.close()` 호출. Spring의 `@PreDestroy`/`@Bean(destroyMethod=...)`와 같은 개념.
+- 나중에 위젯 테스트에서 쓸 `appDatabaseProvider.overrideWithValue(db)`(가짜 인메모리 DB로 교체)는 Spring의 `@MockBean`/프로필별 빈 교체와 같은 개념.
+
+---
+
+## `lib/core/providers/dao_providers.dart`
+
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'database_provider.dart';
+
+final supplierDaoProvider =
+    Provider((ref) => ref.watch(appDatabaseProvider).supplierDao);
+final ingredientDaoProvider =
+    Provider((ref) => ref.watch(appDatabaseProvider).ingredientDao);
+final lotDaoProvider =
+    Provider((ref) => ref.watch(appDatabaseProvider).lotDao);
+final stockMovementDaoProvider =
+    Provider((ref) => ref.watch(appDatabaseProvider).stockMovementDao);
+```
+
+**하는 일**: provider 조합 — `appDatabaseProvider`에서 DB를 받아 그 안의 DAO 하나만 꺼내 별도 provider로 노출. Spring으로 치면 `@Bean public SupplierDao supplierDao(AppDatabase db) { return db.getSupplierDao(); }`와 같다.
+
+**왜**: 화면이 DB 전체가 아니라 필요한 DAO 하나만 주입받게 하려고 — Spring 컨트롤러에 `DataSource` 전체 대신 필요한 `@Repository` 하나만 주입하는 것과 같은 이유.
+
+**`ref.watch()`**: `appDatabaseProvider`를 구독. 그 provider가 바뀌면 이것도 재계산됨(지금은 AppDatabase가 안 바뀌니 실질적 차이 없음, provider 내부에서는 관례적으로 watch 사용).
+
+**타입 생략**: `Provider<AppDatabase>`처럼 명시하지 않고 `Provider((ref) => ...)`로만 썼는데, Dart가 람다의 반환 타입을 보고 `Provider<SupplierDao>` 등으로 자동 추론해서 생략 가능. 동작은 동일, 스타일 차이일 뿐.
+
+---
+
+## `lib/core/providers/repository_providers.dart`
+
+```dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/repositories/lot_repository.dart';
+import 'database_provider.dart';
+
+final lotRepositoryProvider = Provider<LotRepository>((ref) {
+  return LotRepository(ref.watch(appDatabaseProvider));
+});
+```
+
+`database_provider.dart`와 같은 모양(명시적 타입 + 블록 바디)이지만, 이미 있는 getter를 꺼내는 `dao_providers.dart`와 달리 **`LotRepository` 생성자를 직접 호출**해 새 인스턴스를 만든다. Spring의 생성자 주입(`@Bean public LotRepository lotRepository(AppDatabase db) { return new LotRepository(db); }`)과 같은 개념. 이걸로 Task 8(provider 3개 파일) 완료.
