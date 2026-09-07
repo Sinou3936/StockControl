@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../domain/movement_type.dart';
+import '../../domain/stock_adjustment.dart';
 import '../local/database.dart';
 
 class LotRepository {
@@ -41,6 +42,30 @@ class LotRepository {
       );
 
       return lotId;
+    });
+  }
+
+  Future<void> recordQuantityChange({
+    required int lotId,
+    required MovementType type,
+    required double quantity,
+    DateTime? occurredAt,
+    String? memo,
+  }) async {
+    await _db.transaction(() async {
+      final lot = await _db.lotDao.getById(lotId);
+      final newQty = applyQuantityChange(lot.remainingQty, quantity);
+
+      await _db.lotDao.updateRemainingQty(lotId, newQty);
+      await _db.stockMovementDao.insertMovement(
+        StockMovementsCompanion.insert(
+          lotId: lotId,
+          type: type.toDbString(),
+          quantity: quantity,
+          occurredAt: occurredAt ?? DateTime.now(),
+          memo: Value(memo),
+        ),
+      );
     });
   }
 }
