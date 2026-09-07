@@ -357,8 +357,9 @@ Expected: FAIL — `watchAvailableLotsWithIngredient` 메서드가 없어 컴파
 
 ```dart
 import '../../../domain/stock_overview.dart';
-import '../tables/ingredients_table.dart';
 ```
+
+(`ingredients` 테이블 접근자는 이미 `_$LotDaoMixin`이 제공하고 있어서 `ingredients_table.dart`를 따로 import할 필요는 없다.)
 
 `LotDao` 클래스 안에 메서드 추가:
 
