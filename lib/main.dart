@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/ingredient_management/ingredient_list_screen.dart';
 import 'features/inbound/inbound_form_screen.dart';
+import 'features/stock_overview/stock_overview_screen.dart';
 import 'features/supplier_management/supplier_list_screen.dart';
 
 void main() {
@@ -51,6 +52,14 @@ class HomeScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const InboundFormScreen()),
               ),
               child: const Text('입고 등록'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const StockOverviewScreen(),
+                ),
+              ),
+              child: const Text('재고 조회'),
             ),
           ],
         ),

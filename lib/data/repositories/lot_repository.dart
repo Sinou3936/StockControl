@@ -2,8 +2,6 @@ import 'package:drift/drift.dart';
 
 import '../../domain/movement_type.dart';
 import '../local/database.dart';
-import '../local/tables/lots_table.dart';
-import '../local/tables/stock_movements_table.dart';
 
 class LotRepository {
   LotRepository(this._db);
