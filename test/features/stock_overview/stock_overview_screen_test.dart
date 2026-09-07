@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/data/local/database.dart';
+import 'package:stockcontrol/features/stock_adjustment/stock_adjustment_form_screen.dart';
 import 'package:stockcontrol/features/stock_overview/stock_overview_screen.dart';
 
 void main() {
@@ -42,6 +43,11 @@ void main() {
 
     expect(find.textContaining('양파'), findsWidgets);
     expect(find.text('임박'), findsOneWidget);
+
+    await tester.tap(find.text('임박'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StockAdjustmentFormScreen), findsOneWidget);
 
     // Drift watch() 스트림의 구독 취소 시 예약되는 정리용 타이머(0초 지연)를
     // 테스트 종료 전에 흘려보낸다 (inbound_form_screen_test.dart와 동일 패턴).

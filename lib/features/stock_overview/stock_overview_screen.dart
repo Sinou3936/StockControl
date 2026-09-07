@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/dao_providers.dart';
 import '../../data/local/database.dart';
 import '../../domain/stock_overview.dart';
+import '../stock_adjustment/stock_adjustment_form_screen.dart';
 
 class StockOverviewScreen extends ConsumerWidget {
   const StockOverviewScreen({super.key});
@@ -52,16 +53,25 @@ class _IngredientGroupSection extends StatelessWidget {
           ),
         ),
         for (final lot in group.lots)
-          _LotRow(lot: lot, now: DateTime.now()),
+          _LotRow(
+            lot: lot,
+            ingredient: group.ingredient,
+            now: DateTime.now(),
+          ),
       ],
     );
   }
 }
 
 class _LotRow extends StatelessWidget {
-  const _LotRow({required this.lot, required this.now});
+  const _LotRow({
+    required this.lot,
+    required this.ingredient,
+    required this.now,
+  });
 
   final Lot lot;
+  final Ingredient ingredient;
   final DateTime now;
 
   @override
@@ -71,23 +81,35 @@ class _LotRow extends StatelessWidget {
         ? '유통기한 관리 안 함'
         : '유통기한 ${lot.expiryDate!.toIso8601String().substring(0, 10)}';
 
-    return Container(
-      color: near ? Colors.red.shade50 : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(child: Text(expiryText)),
-          if (near)
-            const Padding(
-              padding: EdgeInsets.only(right: 8),
-              child: Text(
-                '임박',
-                style:
-                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => StockAdjustmentFormScreen(
+            lot: lot,
+            ingredient: ingredient,
+          ),
+        ),
+      ),
+      child: Container(
+        color: near ? Colors.red.shade50 : null,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            Expanded(child: Text(expiryText)),
+            if (near)
+              const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Text(
+                  '임박',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
-          Text('${lot.remainingQty}'),
-        ],
+            Text('${lot.remainingQty}'),
+          ],
+        ),
       ),
     );
   }
