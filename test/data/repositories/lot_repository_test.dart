@@ -4,6 +4,7 @@ import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/data/repositories/lot_repository.dart';
 import 'package:stockcontrol/domain/movement_type.dart';
 import 'package:stockcontrol/domain/stock_adjustment.dart';
+import 'package:stockcontrol/domain/stock_count.dart';
 
 void main() {
   late AppDatabase db;
@@ -136,5 +137,41 @@ void main() {
 
     expect(lot.remainingQty, 100);
     expect(movements, isEmpty);
+  });
+
+  test(
+      'submitCountCorrections applies adjustments across multiple lots '
+      'atomically', () async {
+    final oldLotId = await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        receivedDate: DateTime(2026, 9, 1),
+        unitCost: 10.0,
+        remainingQty: 500,
+      ),
+    );
+    final newLotId = await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        receivedDate: DateTime(2026, 9, 5),
+        unitCost: 10.0,
+        remainingQty: 1000,
+      ),
+    );
+
+    await repository.submitCountCorrections([
+      LotQuantityAdjustment(lotId: oldLotId, change: -500),
+      LotQuantityAdjustment(lotId: newLotId, change: -200),
+    ]);
+
+    final oldLot = await db.lotDao.getById(oldLotId);
+    final newLot = await db.lotDao.getById(newLotId);
+    final oldMovements = await db.stockMovementDao.movementsForLot(oldLotId);
+    final newMovements = await db.stockMovementDao.movementsForLot(newLotId);
+
+    expect(oldLot.remainingQty, 0);
+    expect(newLot.remainingQty, 800);
+    expect(oldMovements.first.type, 'countCorrection');
+    expect(newMovements.first.type, 'countCorrection');
   });
 }

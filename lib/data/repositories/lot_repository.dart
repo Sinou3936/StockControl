@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../domain/movement_type.dart';
 import '../../domain/stock_adjustment.dart';
+import '../../domain/stock_count.dart';
 import '../local/database.dart';
 
 class LotRepository {
@@ -66,6 +67,21 @@ class LotRepository {
           memo: Value(memo),
         ),
       );
+    });
+  }
+
+  Future<void> submitCountCorrections(
+    List<LotQuantityAdjustment> adjustments,
+  ) async {
+    await _db.transaction(() async {
+      for (final adjustment in adjustments) {
+        await recordQuantityChange(
+          lotId: adjustment.lotId,
+          type: MovementType.countCorrection,
+          quantity: adjustment.change,
+          memo: '마감 실사 보정',
+        );
+      }
     });
   }
 }
