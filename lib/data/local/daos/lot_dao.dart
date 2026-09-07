@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../domain/stock_overview.dart';
 import '../database.dart';
 import '../tables/lots_table.dart';
 
@@ -22,4 +23,23 @@ class LotDao extends DatabaseAccessor<AppDatabase> with _$LotDaoMixin {
   Stream<List<Lot>> watchLotsForIngredient(int ingredientId) =>
       (select(lots)..where((l) => l.ingredientId.equals(ingredientId)))
           .watch();
+
+  Stream<List<LotWithIngredient>> watchAvailableLotsWithIngredient() {
+    final query = select(lots).join([
+      innerJoin(ingredients, ingredients.id.equalsExp(lots.ingredientId)),
+    ])
+      ..where(lots.remainingQty.isBiggerThanValue(0))
+      ..orderBy([OrderingTerm.asc(lots.expiryDate)]);
+
+    return query.watch().map(
+          (rows) => rows
+              .map(
+                (row) => LotWithIngredient(
+                  lot: row.readTable(lots),
+                  ingredient: row.readTable(ingredients),
+                ),
+              )
+              .toList(),
+        );
+  }
 }
