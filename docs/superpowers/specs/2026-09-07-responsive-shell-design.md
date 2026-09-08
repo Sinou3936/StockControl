@@ -48,4 +48,4 @@ lib/
 - 넓은 화면(1000×800)에서 `NavigationRail`과 5개 목적지 라벨이 뜨는지, 목적지를 탭하면 해당 화면(`find.byType`)으로 바뀌는지
 - 좁은 화면(360×800)에서 `BottomNavigationBar`(4개)가 뜨고 `NavigationRail`은 없는지, "더보기" 탭 시 `MoreScreen`이 위로 뜨고 그 안의 항목이 거래처/품목 관리로 이동하는지
 - 탭을 전환했다가 돌아와도 폼에 입력하던 값이 남아있는지(IndexedStack 상태 유지 검증) — 입고 등록 화면의 수량 필드로 확인
-- 화면 크기 제어는 `tester.binding.setSurfaceSize(...)`로 테스트마다 명시적으로 지정 (기본값에 의존하지 않음)
+- 화면 크기 제어는 `tester.view.physicalSize`/`devicePixelRatio`로 테스트마다 명시적으로 지정 (기본값에 의존하지 않음) — 구현 중 `tester.binding.setSurfaceSize(...)`가 이 Flutter 버전에서 `MediaQuery`에 반영되지 않는 걸 발견해서 `tester.view` API로 교체했다

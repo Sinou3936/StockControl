@@ -166,8 +166,10 @@ void main() {
   testWidgets(
       'shows a navigation rail with 5 destinations on wide screens and '
       'switches the selected content', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1000, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(wrap());
     await tester.pump();
@@ -189,8 +191,10 @@ void main() {
   testWidgets(
       'shows a bottom nav with 4 items on narrow screens and opens '
       'MoreScreen from the fourth item', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(360, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(wrap());
     await tester.pump();
@@ -220,8 +224,10 @@ void main() {
 
   testWidgets('keeps entered form values when switching tabs (IndexedStack)',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1000, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(wrap());
     await tester.pump();
