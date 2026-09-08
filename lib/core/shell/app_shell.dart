@@ -45,6 +45,11 @@ class _AppShellState extends State<AppShell> {
             onDestinationSelected: (index) =>
                 setState(() => _selectedIndex = index),
             labelType: NavigationRailLabelType.all,
+            backgroundColor: Colors.white,
+            selectedIconTheme: const IconThemeData(color: Colors.indigo),
+            unselectedIconTheme: const IconThemeData(color: Colors.black54),
+            selectedLabelTextStyle: const TextStyle(color: Colors.indigo),
+            unselectedLabelTextStyle: const TextStyle(color: Colors.black54),
             destinations: const [
               NavigationRailDestination(
                 icon: Icon(Icons.inventory_2_outlined),
@@ -88,6 +93,10 @@ class _AppShellState extends State<AppShell> {
       body: IndexedStack(index: _selectedIndex, children: _primaryScreens),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: Colors.indigo,
+        unselectedItemColor: Colors.black54,
         onTap: (index) {
           if (index == 3) {
             Navigator.of(context).push(
