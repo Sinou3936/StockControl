@@ -975,7 +975,7 @@ void main() {
     await tester.pump();
 
     await tester.enterText(find.byKey(const Key('pinField')), '123456');
-    await tester.tap(find.text('로그인'));
+    await tester.tap(find.widgetWithText(ElevatedButton, '로그인'));
     await tester.pump();
     await tester.pump();
 
@@ -1005,7 +1005,7 @@ void main() {
     await tester.pump();
 
     await tester.enterText(find.byKey(const Key('pinField')), '000000');
-    await tester.tap(find.text('로그인'));
+    await tester.tap(find.widgetWithText(ElevatedButton, '로그인'));
     await tester.pump();
     await tester.pump();
 
@@ -1056,7 +1056,7 @@ void main() {
       'owner@internal.local',
     );
     await tester.enterText(find.byKey(const Key('manualPinField')), '123456');
-    await tester.tap(find.text('로그인'));
+    await tester.tap(find.widgetWithText(ElevatedButton, '로그인'));
     await tester.pump();
     await tester.pump();
 
@@ -1262,6 +1262,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
 Run: `flutter test test/features/auth/login_screen_test.dart`
 Expected: PASS (3 tests passed)
+
+**실행 중 발견한 문제**: 처음엔 세 테스트 모두 `find.text('로그인')`이 위젯 2개(AppBar 제목 "로그인" + 로그인 버튼)를 동시에 찾아 `tap()`이 모호하다는 에러로 실패했다. AppBar 제목은 화면 목적을 보여주는 자연스러운 텍스트라 그대로 두고, 테스트 쪽에서 `find.widgetWithText(ElevatedButton, '로그인')`로 버튼만 특정하도록 고쳤다(위 코드에 이미 반영됨).
 
 - [ ] **Step 5: Commit**
 
