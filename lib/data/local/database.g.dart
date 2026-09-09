@@ -1885,6 +1885,417 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   }
 }
 
+class $CachedProfilesTable extends CachedProfiles
+    with TableInfo<$CachedProfilesTable, CachedProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+    'email',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pinHashMeta = const VerificationMeta(
+    'pinHash',
+  );
+  @override
+  late final GeneratedColumn<String> pinHash = GeneratedColumn<String>(
+    'pin_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pinSaltMeta = const VerificationMeta(
+    'pinSalt',
+  );
+  @override
+  late final GeneratedColumn<String> pinSalt = GeneratedColumn<String>(
+    'pin_salt',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    displayName,
+    role,
+    email,
+    pinHash,
+    pinSalt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedProfile> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_displayNameMeta);
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+        _emailMeta,
+        email.isAcceptableOrUnknown(data['email']!, _emailMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_emailMeta);
+    }
+    if (data.containsKey('pin_hash')) {
+      context.handle(
+        _pinHashMeta,
+        pinHash.isAcceptableOrUnknown(data['pin_hash']!, _pinHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pinHashMeta);
+    }
+    if (data.containsKey('pin_salt')) {
+      context.handle(
+        _pinSaltMeta,
+        pinSalt.isAcceptableOrUnknown(data['pin_salt']!, _pinSaltMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pinSaltMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedProfile(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      )!,
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      email: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}email'],
+      )!,
+      pinHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pin_hash'],
+      )!,
+      pinSalt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pin_salt'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedProfilesTable createAlias(String alias) {
+    return $CachedProfilesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedProfile extends DataClass implements Insertable<CachedProfile> {
+  final String id;
+  final String displayName;
+  final String role;
+  final String email;
+  final String pinHash;
+  final String pinSalt;
+  const CachedProfile({
+    required this.id,
+    required this.displayName,
+    required this.role,
+    required this.email,
+    required this.pinHash,
+    required this.pinSalt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['display_name'] = Variable<String>(displayName);
+    map['role'] = Variable<String>(role);
+    map['email'] = Variable<String>(email);
+    map['pin_hash'] = Variable<String>(pinHash);
+    map['pin_salt'] = Variable<String>(pinSalt);
+    return map;
+  }
+
+  CachedProfilesCompanion toCompanion(bool nullToAbsent) {
+    return CachedProfilesCompanion(
+      id: Value(id),
+      displayName: Value(displayName),
+      role: Value(role),
+      email: Value(email),
+      pinHash: Value(pinHash),
+      pinSalt: Value(pinSalt),
+    );
+  }
+
+  factory CachedProfile.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedProfile(
+      id: serializer.fromJson<String>(json['id']),
+      displayName: serializer.fromJson<String>(json['displayName']),
+      role: serializer.fromJson<String>(json['role']),
+      email: serializer.fromJson<String>(json['email']),
+      pinHash: serializer.fromJson<String>(json['pinHash']),
+      pinSalt: serializer.fromJson<String>(json['pinSalt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'displayName': serializer.toJson<String>(displayName),
+      'role': serializer.toJson<String>(role),
+      'email': serializer.toJson<String>(email),
+      'pinHash': serializer.toJson<String>(pinHash),
+      'pinSalt': serializer.toJson<String>(pinSalt),
+    };
+  }
+
+  CachedProfile copyWith({
+    String? id,
+    String? displayName,
+    String? role,
+    String? email,
+    String? pinHash,
+    String? pinSalt,
+  }) => CachedProfile(
+    id: id ?? this.id,
+    displayName: displayName ?? this.displayName,
+    role: role ?? this.role,
+    email: email ?? this.email,
+    pinHash: pinHash ?? this.pinHash,
+    pinSalt: pinSalt ?? this.pinSalt,
+  );
+  CachedProfile copyWithCompanion(CachedProfilesCompanion data) {
+    return CachedProfile(
+      id: data.id.present ? data.id.value : this.id,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      role: data.role.present ? data.role.value : this.role,
+      email: data.email.present ? data.email.value : this.email,
+      pinHash: data.pinHash.present ? data.pinHash.value : this.pinHash,
+      pinSalt: data.pinSalt.present ? data.pinSalt.value : this.pinSalt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedProfile(')
+          ..write('id: $id, ')
+          ..write('displayName: $displayName, ')
+          ..write('role: $role, ')
+          ..write('email: $email, ')
+          ..write('pinHash: $pinHash, ')
+          ..write('pinSalt: $pinSalt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, displayName, role, email, pinHash, pinSalt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedProfile &&
+          other.id == this.id &&
+          other.displayName == this.displayName &&
+          other.role == this.role &&
+          other.email == this.email &&
+          other.pinHash == this.pinHash &&
+          other.pinSalt == this.pinSalt);
+}
+
+class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
+  final Value<String> id;
+  final Value<String> displayName;
+  final Value<String> role;
+  final Value<String> email;
+  final Value<String> pinHash;
+  final Value<String> pinSalt;
+  final Value<int> rowid;
+  const CachedProfilesCompanion({
+    this.id = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.role = const Value.absent(),
+    this.email = const Value.absent(),
+    this.pinHash = const Value.absent(),
+    this.pinSalt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedProfilesCompanion.insert({
+    required String id,
+    required String displayName,
+    required String role,
+    required String email,
+    required String pinHash,
+    required String pinSalt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       displayName = Value(displayName),
+       role = Value(role),
+       email = Value(email),
+       pinHash = Value(pinHash),
+       pinSalt = Value(pinSalt);
+  static Insertable<CachedProfile> custom({
+    Expression<String>? id,
+    Expression<String>? displayName,
+    Expression<String>? role,
+    Expression<String>? email,
+    Expression<String>? pinHash,
+    Expression<String>? pinSalt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (displayName != null) 'display_name': displayName,
+      if (role != null) 'role': role,
+      if (email != null) 'email': email,
+      if (pinHash != null) 'pin_hash': pinHash,
+      if (pinSalt != null) 'pin_salt': pinSalt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedProfilesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? displayName,
+    Value<String>? role,
+    Value<String>? email,
+    Value<String>? pinHash,
+    Value<String>? pinSalt,
+    Value<int>? rowid,
+  }) {
+    return CachedProfilesCompanion(
+      id: id ?? this.id,
+      displayName: displayName ?? this.displayName,
+      role: role ?? this.role,
+      email: email ?? this.email,
+      pinHash: pinHash ?? this.pinHash,
+      pinSalt: pinSalt ?? this.pinSalt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (pinHash.present) {
+      map['pin_hash'] = Variable<String>(pinHash.value);
+    }
+    if (pinSalt.present) {
+      map['pin_salt'] = Variable<String>(pinSalt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedProfilesCompanion(')
+          ..write('id: $id, ')
+          ..write('displayName: $displayName, ')
+          ..write('role: $role, ')
+          ..write('email: $email, ')
+          ..write('pinHash: $pinHash, ')
+          ..write('pinSalt: $pinSalt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1892,10 +2303,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $IngredientsTable ingredients = $IngredientsTable(this);
   late final $LotsTable lots = $LotsTable(this);
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
+  late final $CachedProfilesTable cachedProfiles = $CachedProfilesTable(this);
   late final SupplierDao supplierDao = SupplierDao(this as AppDatabase);
   late final IngredientDao ingredientDao = IngredientDao(this as AppDatabase);
   late final LotDao lotDao = LotDao(this as AppDatabase);
   late final StockMovementDao stockMovementDao = StockMovementDao(
+    this as AppDatabase,
+  );
+  late final CachedProfileDao cachedProfileDao = CachedProfileDao(
     this as AppDatabase,
   );
   @override
@@ -1907,6 +2322,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ingredients,
     lots,
     stockMovements,
+    cachedProfiles,
   ];
 }
 
@@ -3494,6 +3910,229 @@ typedef $$StockMovementsTableProcessedTableManager =
       StockMovement,
       PrefetchHooks Function({bool lotId})
     >;
+typedef $$CachedProfilesTableCreateCompanionBuilder =
+    CachedProfilesCompanion Function({
+      required String id,
+      required String displayName,
+      required String role,
+      required String email,
+      required String pinHash,
+      required String pinSalt,
+      Value<int> rowid,
+    });
+typedef $$CachedProfilesTableUpdateCompanionBuilder =
+    CachedProfilesCompanion Function({
+      Value<String> id,
+      Value<String> displayName,
+      Value<String> role,
+      Value<String> email,
+      Value<String> pinHash,
+      Value<String> pinSalt,
+      Value<int> rowid,
+    });
+
+class $$CachedProfilesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedProfilesTable> {
+  $$CachedProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get email => $composableBuilder(
+    column: $table.email,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pinHash => $composableBuilder(
+    column: $table.pinHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pinSalt => $composableBuilder(
+    column: $table.pinSalt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedProfilesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedProfilesTable> {
+  $$CachedProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get email => $composableBuilder(
+    column: $table.email,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pinHash => $composableBuilder(
+    column: $table.pinHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pinSalt => $composableBuilder(
+    column: $table.pinSalt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedProfilesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedProfilesTable> {
+  $$CachedProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get pinHash =>
+      $composableBuilder(column: $table.pinHash, builder: (column) => column);
+
+  GeneratedColumn<String> get pinSalt =>
+      $composableBuilder(column: $table.pinSalt, builder: (column) => column);
+}
+
+class $$CachedProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedProfilesTable,
+          CachedProfile,
+          $$CachedProfilesTableFilterComposer,
+          $$CachedProfilesTableOrderingComposer,
+          $$CachedProfilesTableAnnotationComposer,
+          $$CachedProfilesTableCreateCompanionBuilder,
+          $$CachedProfilesTableUpdateCompanionBuilder,
+          (
+            CachedProfile,
+            BaseReferences<_$AppDatabase, $CachedProfilesTable, CachedProfile>,
+          ),
+          CachedProfile,
+          PrefetchHooks Function()
+        > {
+  $$CachedProfilesTableTableManager(
+    _$AppDatabase db,
+    $CachedProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedProfilesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedProfilesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedProfilesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> displayName = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<String> email = const Value.absent(),
+                Value<String> pinHash = const Value.absent(),
+                Value<String> pinSalt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedProfilesCompanion(
+                id: id,
+                displayName: displayName,
+                role: role,
+                email: email,
+                pinHash: pinHash,
+                pinSalt: pinSalt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String displayName,
+                required String role,
+                required String email,
+                required String pinHash,
+                required String pinSalt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedProfilesCompanion.insert(
+                id: id,
+                displayName: displayName,
+                role: role,
+                email: email,
+                pinHash: pinHash,
+                pinSalt: pinSalt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedProfilesTable,
+      CachedProfile,
+      $$CachedProfilesTableFilterComposer,
+      $$CachedProfilesTableOrderingComposer,
+      $$CachedProfilesTableAnnotationComposer,
+      $$CachedProfilesTableCreateCompanionBuilder,
+      $$CachedProfilesTableUpdateCompanionBuilder,
+      (
+        CachedProfile,
+        BaseReferences<_$AppDatabase, $CachedProfilesTable, CachedProfile>,
+      ),
+      CachedProfile,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3505,4 +4144,6 @@ class $AppDatabaseManager {
   $$LotsTableTableManager get lots => $$LotsTableTableManager(_db, _db.lots);
   $$StockMovementsTableTableManager get stockMovements =>
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
+  $$CachedProfilesTableTableManager get cachedProfiles =>
+      $$CachedProfilesTableTableManager(_db, _db.cachedProfiles);
 }
