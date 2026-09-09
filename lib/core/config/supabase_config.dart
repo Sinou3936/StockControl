@@ -1,0 +1,3 @@
+const supabaseUrl = 'https://nrgrqxzpzliolkgacfmj.supabase.co';
+const supabaseAnonKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZ3JxeHpwemxpb2xrZ2FjZm1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NzQ5OTgsImV4cCI6MjA4OTU1MDk5OH0.h5SprHQg8odLyueLSypX9Hin1XQnvRrnxARzhk4ZDjg';
