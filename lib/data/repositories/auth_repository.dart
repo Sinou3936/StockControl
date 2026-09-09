@@ -80,4 +80,29 @@ class AuthRepository {
       return AuthResult(outcome: AuthOutcome.invalidPin);
     }
   }
+
+  Future<void> addStaff({
+    required String displayName,
+    required String pin,
+    required String ownerEmail,
+    required String ownerPin,
+  }) async {
+    final syntheticEmail =
+        'staff-${DateTime.now().millisecondsSinceEpoch}@internal.local';
+
+    final newUser = await _gateway.signUp(
+      email: syntheticEmail,
+      password: pin,
+    );
+
+    await _gateway.insertProfile(
+      id: newUser.id,
+      displayName: displayName,
+      role: 'staff',
+    );
+
+    // signUp()이 세션을 방금 만든 직원 계정으로 바꿔버리므로, 사장 계정으로
+    // 다시 로그인해서 세션을 복구한다.
+    await _gateway.signInWithPassword(email: ownerEmail, password: ownerPin);
+  }
 }

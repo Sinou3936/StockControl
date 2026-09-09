@@ -10,3 +10,5 @@ final lotDaoProvider =
     Provider((ref) => ref.watch(appDatabaseProvider).lotDao);
 final stockMovementDaoProvider =
     Provider((ref) => ref.watch(appDatabaseProvider).stockMovementDao);
+final cachedProfileDaoProvider =
+    Provider((ref) => ref.watch(appDatabaseProvider).cachedProfileDao);
