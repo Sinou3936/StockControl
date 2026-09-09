@@ -36,6 +36,10 @@ class MoreScreen extends ConsumerWidget {
               title: const Text('직원 추가'),
               onTap: () => pushAddStaffScreen(context),
             ),
+          ListTile(
+            title: const Text('로그아웃'),
+            onTap: () => ref.read(authSessionProvider.notifier).clear(),
+          ),
         ],
       ),
     );

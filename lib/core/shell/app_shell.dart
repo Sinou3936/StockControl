@@ -87,6 +87,21 @@ class _AppShellState extends ConsumerState<AppShell> {
                   label: Text('직원 추가'),
                 ),
             ],
+            trailing: Expanded(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: IconButton(
+                    key: const Key('logoutButton'),
+                    icon: const Icon(Icons.logout),
+                    tooltip: '로그아웃',
+                    onPressed: () =>
+                        ref.read(authSessionProvider.notifier).clear(),
+                  ),
+                ),
+              ),
+            ),
           ),
           const VerticalDivider(width: 1),
           Expanded(

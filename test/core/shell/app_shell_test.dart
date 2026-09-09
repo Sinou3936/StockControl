@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/core/shell/app_shell.dart';
 import 'package:stockcontrol/core/shell/more_screen.dart';
@@ -102,6 +103,45 @@ void main() {
     await tester.pump();
 
     expect(find.text('3'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('desktop sidebar logout button clears the auth session',
+      (tester) async {
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'owner@internal.local',
+            pin: '123456',
+            displayName: '사장님',
+            role: 'owner',
+          ),
+        );
+
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AppShell()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('logoutButton')));
+    await tester.pump();
+
+    expect(container.read(authSessionProvider), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

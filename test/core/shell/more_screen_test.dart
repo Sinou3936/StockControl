@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/core/shell/more_screen.dart';
 import 'package:stockcontrol/data/local/database.dart';
@@ -42,6 +43,39 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(IngredientListScreen), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('logging out clears the auth session', (tester) async {
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'owner@internal.local',
+            pin: '123456',
+            displayName: '사장님',
+            role: 'owner',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MoreScreen()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('로그아웃'));
+    await tester.pump();
+
+    expect(container.read(authSessionProvider), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
