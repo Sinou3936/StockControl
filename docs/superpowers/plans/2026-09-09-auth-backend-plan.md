@@ -817,11 +817,30 @@ git commit -m "feat: add AuthRepository with online/offline PIN login"
       role: 'staff',
     );
 
+    // 이 기기의 로그인 화면 이름 목록에 바로 뜨고, 곧바로 PIN으로 로그인할 수
+    // 있도록 login()과 동일하게 로컬 캐시에도 저장해둔다. addStaff()를 거치지
+    // 않으면 이 직원은 실제로 한 번 로그인하기 전까지는 캐시에 없어서, 이름
+    // 목록에도 안 뜨고 자동 생성된 이메일도 알 방법이 없어 로그인 자체가
+    // 불가능해진다.
+    final salt = generatePinSalt();
+    await _cachedProfileDao.upsertProfile(
+      CachedProfilesCompanion.insert(
+        id: newUser.id,
+        displayName: displayName,
+        role: 'staff',
+        email: syntheticEmail,
+        pinHash: hashPin(pin, salt),
+        pinSalt: salt,
+      ),
+    );
+
     // signUp()이 세션을 방금 만든 직원 계정으로 바꿔버리므로, 사장 계정으로
     // 다시 로그인해서 세션을 복구한다.
     await _gateway.signInWithPassword(email: ownerEmail, password: ownerPin);
   }
 ```
+
+**실행 중 발견한 문제**: 실기기 테스트에서 "직원 추가를 했는데 로그인 화면에 안 뜬다"는 문제가 나왔다. 원래 코드는 `addStaff()`가 서버에 계정만 만들고 이 기기의 `CachedProfiles`에는 아무것도 남기지 않아서, 그 직원이 실제로 한 번 로그인하기 전까지는 이름 목록에 뜰 수 없었고 — 자동 생성된 이메일을 아무도 모르니 수동 입력으로도 로그인이 불가능했다. `login()`과 동일하게 `addStaff()`도 PIN을 해시해서 로컬 캐시에 즉시 저장하도록 고쳤다(위 코드에 반영). `test/data/repositories/auth_repository_test.dart`에 이 경로를 검증하는 테스트를 추가했다.
 
 - [ ] **Step 2: 정적 분석 확인**
 

@@ -101,6 +101,23 @@ class AuthRepository {
       role: 'staff',
     );
 
+    // 이 기기의 로그인 화면 이름 목록에 바로 뜨고, 곧바로 PIN으로 로그인할 수
+    // 있도록 login()과 동일하게 로컬 캐시에도 저장해둔다. addStaff()를 거치지
+    // 않으면 이 직원은 실제로 한 번 로그인하기 전까지는 캐시에 없어서, 이름
+    // 목록에도 안 뜨고 자동 생성된 이메일도 알 방법이 없어 로그인 자체가
+    // 불가능해진다.
+    final salt = generatePinSalt();
+    await _cachedProfileDao.upsertProfile(
+      CachedProfilesCompanion.insert(
+        id: newUser.id,
+        displayName: displayName,
+        role: 'staff',
+        email: syntheticEmail,
+        pinHash: hashPin(pin, salt),
+        pinSalt: salt,
+      ),
+    );
+
     // signUp()이 세션을 방금 만든 직원 계정으로 바꿔버리므로, 사장 계정으로
     // 다시 로그인해서 세션을 복구한다.
     await _gateway.signInWithPassword(email: ownerEmail, password: ownerPin);

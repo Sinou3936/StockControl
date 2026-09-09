@@ -122,4 +122,46 @@ void main() {
 
     expect(result.outcome, AuthOutcome.offlineNoCache);
   });
+
+  test(
+      'addStaff caches the new staff profile locally so they can log in '
+      'on this device afterward', () async {
+    final gateway = FakeAuthGateway()
+      ..seedUser(
+        id: 'user-1',
+        email: 'owner@internal.local',
+        password: '123456',
+        displayName: '사장님',
+        role: 'owner',
+      );
+
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
+
+    await repository.addStaff(
+      displayName: '직원1',
+      pin: '111111',
+      ownerEmail: 'owner@internal.local',
+      ownerPin: '123456',
+    );
+
+    final cachedProfiles = await db.cachedProfileDao.watchAll().first;
+    final staffProfiles = cachedProfiles.where((p) => p.role == 'staff');
+    expect(staffProfiles, hasLength(1));
+
+    final staff = staffProfiles.single;
+    expect(staff.displayName, '직원1');
+
+    final offlineGateway = FakeAuthGateway(throwNetworkError: true);
+    final offlineRepository =
+        AuthRepository(offlineGateway, db.cachedProfileDao);
+
+    final result = await offlineRepository.login(
+      id: staff.id,
+      email: staff.email,
+      pin: '111111',
+    );
+
+    expect(result.outcome, AuthOutcome.success);
+    expect(result.displayName, '직원1');
+  });
 }
