@@ -1553,9 +1553,14 @@ import 'features/auth/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+  await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseAnonKey);
   runApp(const ProviderScope(child: StockControlApp()));
 }
+```
+
+**실행 중 발견한 문제**: `anonKey`는 `supabase_flutter` 2.17.2에서 이미 deprecated 상태라(`flutter analyze`가 `deprecated_member_use` 경고를 냄) `publishableKey`로 바꿨다 — 값(anon key 문자열)은 그대로 재사용한다.
+
+```dart
 
 class StockControlApp extends ConsumerWidget {
   const StockControlApp({super.key});
