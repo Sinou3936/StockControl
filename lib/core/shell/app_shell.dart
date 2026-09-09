@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/count/count_screen.dart';
 import '../../features/ingredient_management/ingredient_list_screen.dart';
 import '../../features/inbound/inbound_form_screen.dart';
 import '../../features/stock_overview/stock_overview_screen.dart';
 import '../../features/supplier_management/supplier_list_screen.dart';
+import '../providers/auth_providers.dart';
+import 'auth_add_staff_route.dart';
 import 'more_screen.dart';
 
 const _kDesktopBreakpoint = 600.0;
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
   static const _primaryScreens = [
@@ -37,40 +40,52 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildDesktop() {
+    final isOwner = ref.watch(authSessionProvider)?.isOwner ?? false;
+
     return Scaffold(
       body: Row(
         children: [
           NavigationRail(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) =>
-                setState(() => _selectedIndex = index),
+            onDestinationSelected: (index) {
+              if (isOwner && index == 5) {
+                pushAddStaffScreen(context);
+                return;
+              }
+              setState(() => _selectedIndex = index);
+            },
             labelType: NavigationRailLabelType.all,
             backgroundColor: Colors.white,
             selectedIconTheme: const IconThemeData(color: Colors.indigo),
             unselectedIconTheme: const IconThemeData(color: Colors.black54),
             selectedLabelTextStyle: const TextStyle(color: Colors.indigo),
             unselectedLabelTextStyle: const TextStyle(color: Colors.black54),
-            destinations: const [
-              NavigationRailDestination(
+            destinations: [
+              const NavigationRailDestination(
                 icon: Icon(Icons.inventory_2_outlined),
                 label: Text('재고 조회'),
               ),
-              NavigationRailDestination(
+              const NavigationRailDestination(
                 icon: Icon(Icons.input),
                 label: Text('입고 등록'),
               ),
-              NavigationRailDestination(
+              const NavigationRailDestination(
                 icon: Icon(Icons.fact_check_outlined),
                 label: Text('마감 실사'),
               ),
-              NavigationRailDestination(
+              const NavigationRailDestination(
                 icon: Icon(Icons.store_outlined),
                 label: Text('거래처 관리'),
               ),
-              NavigationRailDestination(
+              const NavigationRailDestination(
                 icon: Icon(Icons.category_outlined),
                 label: Text('품목 관리'),
               ),
+              if (isOwner)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.person_add_outlined),
+                  label: Text('직원 추가'),
+                ),
             ],
           ),
           const VerticalDivider(width: 1),
