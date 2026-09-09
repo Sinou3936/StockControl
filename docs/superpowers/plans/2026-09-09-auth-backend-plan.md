@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Supabase 백엔드를 연결하고, 이름 선택 + 4자리 PIN으로 로그인하는 화면(온라인/오프라인 모두 동작)과 사장 전용 "직원 추가" 화면을 추가한다.
+**Goal:** Supabase 백엔드를 연결하고, 이름 선택 + 6자리 PIN으로 로그인하는 화면(온라인/오프라인 모두 동작)과 사장 전용 "직원 추가" 화면을 추가한다.
 
 **Architecture:** Supabase Auth를 "가짜 이메일 + PIN을 비밀번호로 사용"하는 방식으로 감싼다. 로그인 성공 시 PIN을 해시해서 로컬 Drift DB에 캐싱해두고, 네트워크 오류로 온라인 로그인이 안 될 때는 이 로컬 캐시로 대체한다. `AuthRepository`가 이 온라인/오프라인 전환 로직을 전담하고, 화면은 그 결과만 보고 반응한다.
 
@@ -19,7 +19,7 @@
 **Task 1 시작 전에 Supabase 대시보드에서 아래를 수동으로 설정해야 한다** (앱 코드가 아니라 Supabase 프로젝트 설정):
 
 1. **Authentication → Providers → Email**: "Confirm email" 옵션을 끈다 (내부용 가짜 이메일은 실제 수신함이 없어 인증 메일을 확인할 수 없음)
-2. **Authentication → Providers → Email → Password**: 최소 길이를 4로 낮춘다 (PIN이 4자리 숫자)
+2. **Authentication → Providers → Email → Password**: "Minimum password length"를 확인한다 — Supabase 대시보드는 6 미만으로 낮출 수 없으므로 6으로 맞춘다 (PIN도 4자리 대신 6자리 숫자로 결정)
 3. **SQL Editor**에서 아래 SQL 실행:
    ```sql
    create table public.profiles (
@@ -41,7 +41,7 @@
      to authenticated
      with check (auth.uid() = id);
    ```
-4. **Authentication → Users → Add user**로 사장 계정을 1개 만든다 (예: 이메일 `owner@internal.local`, 비밀번호로 4자리 PIN 입력, "Auto Confirm User" 체크)
+4. **Authentication → Users → Add user**로 사장 계정을 1개 만든다 (예: 이메일 `owner@internal.local`, 비밀번호로 6자리 PIN 입력, "Auto Confirm User" 체크)
 5. **SQL Editor**에서 방금 만든 사장 계정의 `profiles` 행을 하나 만든다 (아래 SQL의 `<owner-user-id>`는 3번 단계에서 만든 사용자의 UUID로 교체 — Authentication → Users 목록에서 확인 가능):
    ```sql
    insert into public.profiles (id, display_name, role)
@@ -1019,7 +1019,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             controller: _pinController,
             obscureText: true,
             keyboardType: TextInputType.number,
-            maxLength: 4,
+            maxLength: 6,
             decoration: const InputDecoration(labelText: 'PIN'),
           ),
           if (_errorText != null)
@@ -1057,7 +1057,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             controller: _pinController,
             obscureText: true,
             keyboardType: TextInputType.number,
-            maxLength: 4,
+            maxLength: 6,
             decoration: const InputDecoration(labelText: 'PIN'),
           ),
           if (_errorText != null)
@@ -1161,7 +1161,7 @@ void main() {
     await tester.tap(find.text('추가'));
     await tester.pump();
 
-    expect(find.text('이름과 4자리 PIN을 입력하세요'), findsOneWidget);
+    expect(find.text('이름과 6자리 PIN을 입력하세요'), findsOneWidget);
   });
 }
 ```
@@ -1218,8 +1218,8 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
               controller: _pinController,
               obscureText: true,
               keyboardType: TextInputType.number,
-              maxLength: 4,
-              decoration: const InputDecoration(labelText: 'PIN (4자리)'),
+              maxLength: 6,
+              decoration: const InputDecoration(labelText: 'PIN (6자리)'),
             ),
             if (_errorText != null)
               Text(_errorText!, style: const TextStyle(color: Colors.red)),
@@ -1235,8 +1235,8 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
     final name = _nameController.text.trim();
     final pin = _pinController.text.trim();
 
-    if (name.isEmpty || pin.length != 4) {
-      setState(() => _errorText = '이름과 4자리 PIN을 입력하세요');
+    if (name.isEmpty || pin.length != 6) {
+      setState(() => _errorText = '이름과 6자리 PIN을 입력하세요');
       return;
     }
 
