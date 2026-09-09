@@ -6,7 +6,7 @@
 
 **Architecture:** Supabase Auth를 "가짜 이메일 + PIN을 비밀번호로 사용"하는 방식으로 감싼다. 로그인 성공 시 PIN을 해시해서 로컬 Drift DB에 캐싱해두고, 네트워크 오류로 온라인 로그인이 안 될 때는 이 로컬 캐시로 대체한다. `AuthRepository`가 이 온라인/오프라인 전환 로직을 전담하고, 화면은 그 결과만 보고 반응한다.
 
-**Tech Stack:** Flutter, Supabase(Auth + Postgres), Drift(로컬 캐시), Riverpod, `crypto`(해시), `supabase_testing`(테스트용 Supabase 목업)
+**Tech Stack:** Flutter, Supabase(Auth + Postgres), Drift(로컬 캐시), Riverpod, `crypto`(해시). 테스트용 Supabase 대체물은 별도 패키지 없이, 이 계획에서 직접 정의하는 `AuthGateway` 인터페이스와 그 가짜 구현(`FakeAuthGateway`)으로 충당한다 — 실행 중 발견한 변경사항 참고.
 
 ---
 
@@ -50,11 +50,23 @@
 
 ---
 
-### Task 1: 의존성 추가 + Supabase 설정 파일
+## 실행 중 발견한 변경사항
+
+Task 1 진행 중, `supabase_testing`(0.1.1)이 아직 정식 출시되지 않은 `supabase` 3.0.0-dev 프리릴리스에만 의존한다는 사실이 드러났다 — 우리가 쓰는 안정 버전 `supabase_flutter`(2.17.2)는 `supabase` 2.16.1에 의존하므로, 이 둘을 동시에 pubspec에 넣는 것 자체가 버전 충돌로 불가능하다(`flutter pub add --dev supabase_testing http` 실행 시 즉시 실패로 확인됨). 새로 나온 패키지라 아직 안정 버전 라인을 지원하지 않는 상태로 보인다.
+
+그래서 Task 4 이후 계획을 다음과 같이 바꿨다:
+- `AuthRepository`가 `SupabaseClient`를 직접 들고 있는 대신, 이 계획에서 직접 정의하는 작은 인터페이스 `AuthGateway`(로그인/회원가입/프로필 조회·삽입 4개 메서드)에 의존하도록 한다.
+- 실제 앱에서는 `SupabaseAuthGateway`(Supabase SDK를 감싼 구현)를 쓰고, 테스트에서는 `test/support/fake_auth_gateway.dart`에 정의하는 순수 인메모리 `FakeAuthGateway`를 쓴다 — HTTP 레이어를 흉내 낼 필요 없이 로그인 성공/네트워크 오류(`AuthRetryableFetchException`)/PIN 불일치(`AuthApiException`) 세 시나리오를 직접 제어할 수 있다.
+- 새 의존성 추가 없이(추가 mocking 라이브러리 없이) 기존 Drift 테스트들과 같은 스타일(진짜 객체 대신 손으로 만든 가짜 구현)을 유지한다.
+
+---
+
+### Task 1: 의존성 추가 + Supabase 설정 + AuthGateway 인터페이스
 
 **Files:**
 - Modify: `pubspec.yaml`
 - Create: `lib/core/config/supabase_config.dart`
+- Create: `lib/data/services/auth_gateway.dart`
 
 - [ ] **Step 1: 런타임 의존성 추가**
 
@@ -63,14 +75,7 @@ Run:
 flutter pub add supabase_flutter crypto
 ```
 
-- [ ] **Step 2: 개발 의존성 추가**
-
-Run:
-```bash
-flutter pub add --dev supabase_testing http
-```
-
-- [ ] **Step 3: Supabase 설정 상수 파일 작성**
+- [ ] **Step 2: Supabase 설정 상수 파일 작성**
 
 `lib/core/config/supabase_config.dart`:
 ```dart
@@ -79,11 +84,104 @@ const supabaseAnonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZ3JxeHpwemxpb2xrZ2FjZm1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NzQ5OTgsImV4cCI6MjA4OTU1MDk5OH0.h5SprHQg8odLyueLSypX9Hin1XQnvRrnxARzhk4ZDjg';
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: AuthGateway 인터페이스 + 실제 구현 작성**
+
+`lib/data/services/auth_gateway.dart`:
+```dart
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class AuthGatewayUser {
+  AuthGatewayUser(this.id);
+
+  final String id;
+}
+
+abstract class AuthGateway {
+  Future<AuthGatewayUser> signInWithPassword({
+    required String email,
+    required String password,
+  });
+
+  Future<AuthGatewayUser> signUp({
+    required String email,
+    required String password,
+  });
+
+  Future<Map<String, dynamic>> fetchProfile(String userId);
+
+  Future<void> insertProfile({
+    required String id,
+    required String displayName,
+    required String role,
+  });
+}
+
+class SupabaseAuthGateway implements AuthGateway {
+  SupabaseAuthGateway(this._client);
+
+  final SupabaseClient _client;
+
+  @override
+  Future<AuthGatewayUser> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    final response = await _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+    final user = response.user;
+    if (user == null) {
+      throw const AuthApiException('로그인에 실패했습니다');
+    }
+    return AuthGatewayUser(user.id);
+  }
+
+  @override
+  Future<AuthGatewayUser> signUp({
+    required String email,
+    required String password,
+  }) async {
+    final response = await _client.auth.signUp(email: email, password: password);
+    final user = response.user;
+    if (user == null) {
+      throw const AuthApiException('계정 생성에 실패했습니다');
+    }
+    return AuthGatewayUser(user.id);
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchProfile(String userId) {
+    return _client.from('profiles').select().eq('id', userId).single();
+  }
+
+  @override
+  Future<void> insertProfile({
+    required String id,
+    required String displayName,
+    required String role,
+  }) {
+    return _client.from('profiles').insert({
+      'id': id,
+      'display_name': displayName,
+      'role': role,
+    });
+  }
+}
+```
+
+`AuthGateway`는 순수 인터페이스라 이 파일 자체에는 단위 테스트를 붙이지 않는다 — `SupabaseAuthGateway`는 실제 네트워크 없이는 검증할 수 없고(수동 확인은 Task 8에서 진행), 분기 로직(성공/실패)의 테스트는 Task 4에서 `FakeAuthGateway`로 검증한다.
+
+- [ ] **Step 4: 정적 분석 확인**
+
+Run: `flutter analyze lib/data/services/auth_gateway.dart`
+Expected: `No issues found!`
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add pubspec.yaml pubspec.lock lib/core/config/supabase_config.dart
-git commit -m "chore: add Supabase and PIN-hashing dependencies"
+git add pubspec.yaml pubspec.lock lib/core/config/supabase_config.dart lib/data/services/auth_gateway.dart
+git commit -m "chore: add Supabase dependency and AuthGateway abstraction"
 ```
 
 ---
@@ -366,28 +464,99 @@ git commit -m "feat: add local cache table for offline PIN login"
 
 **Files:**
 - Create: `lib/data/repositories/auth_repository.dart`
+- Create: `test/support/fake_auth_gateway.dart`
 - Test: `test/data/repositories/auth_repository_test.dart`
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [ ] **Step 1: 테스트용 가짜 AuthGateway 작성**
+
+`test/support/fake_auth_gateway.dart`:
+```dart
+import 'package:stockcontrol/data/services/auth_gateway.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class FakeAuthGateway implements AuthGateway {
+  FakeAuthGateway({this.throwNetworkError = false});
+
+  final bool throwNetworkError;
+  final Map<String, _FakeUser> _usersByEmail = {};
+  final Map<String, Map<String, dynamic>> _profilesById = {};
+
+  void seedUser({
+    required String id,
+    required String email,
+    required String password,
+    required String displayName,
+    required String role,
+  }) {
+    _usersByEmail[email] = _FakeUser(id: id, password: password);
+    _profilesById[id] = {'id': id, 'display_name': displayName, 'role': role};
+  }
+
+  @override
+  Future<AuthGatewayUser> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    if (throwNetworkError) {
+      throw AuthRetryableFetchException(message: '시뮬레이션된 네트워크 오류');
+    }
+    final user = _usersByEmail[email];
+    if (user == null || user.password != password) {
+      throw const AuthApiException('이메일 또는 PIN이 올바르지 않습니다');
+    }
+    return AuthGatewayUser(user.id);
+  }
+
+  @override
+  Future<AuthGatewayUser> signUp({
+    required String email,
+    required String password,
+  }) async {
+    final id = 'fake-user-${_usersByEmail.length + 1}';
+    _usersByEmail[email] = _FakeUser(id: id, password: password);
+    return AuthGatewayUser(id);
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchProfile(String userId) async {
+    final profile = _profilesById[userId];
+    if (profile == null) {
+      throw const AuthApiException('프로필을 찾을 수 없습니다');
+    }
+    return profile;
+  }
+
+  @override
+  Future<void> insertProfile({
+    required String id,
+    required String displayName,
+    required String role,
+  }) async {
+    _profilesById[id] = {'id': id, 'display_name': displayName, 'role': role};
+  }
+}
+
+class _FakeUser {
+  _FakeUser({required this.id, required this.password});
+
+  final String id;
+  final String password;
+}
+```
+
+`FakeAuthGateway`는 `test/support/`에 두고 이후 Task 6의 위젯 테스트에서도 그대로 재사용한다 — `seedUser()`로 "서버에 이미 존재하는 사용자"를 등록해두고, `throwNetworkError: true`로 네트워크 실패 시나리오를 재현한다.
+
+- [ ] **Step 2: 실패하는 테스트 작성**
 
 `test/data/repositories/auth_repository_test.dart`:
 ```dart
-import 'dart:io';
-
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/data/repositories/auth_repository.dart';
 import 'package:stockcontrol/domain/pin_hash.dart';
-import 'package:supabase_testing/supabase_testing.dart';
 
-class _ThrowingHttpClient extends http.BaseClient {
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    throw const SocketException('Simulated network failure');
-  }
-}
+import '../../support/fake_auth_gateway.dart';
 
 void main() {
   late AppDatabase db;
@@ -399,22 +568,21 @@ void main() {
   tearDown(() => db.close());
 
   test('login succeeds online and caches the profile locally', () async {
-    final httpClient = MockSupabaseHttpClient()
-      ..stubSignIn(
-        user: testUserJson(id: 'user-1', email: 'owner@internal.local'),
-      )
-      ..stubTable('profiles', rows: [
-        {'id': 'user-1', 'display_name': '사장님', 'role': 'owner'},
-      ]);
-    final supabase = testSupabaseClient(httpClient: httpClient);
-    addTearDown(supabase.dispose);
+    final gateway = FakeAuthGateway()
+      ..seedUser(
+        id: 'user-1',
+        email: 'owner@internal.local',
+        password: '123456',
+        displayName: '사장님',
+        role: 'owner',
+      );
 
-    final repository = AuthRepository(supabase, db.cachedProfileDao);
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
 
     final result = await repository.login(
       id: 'user-1',
       email: 'owner@internal.local',
-      pin: '1234',
+      pin: '123456',
     );
 
     expect(result.outcome, AuthOutcome.success);
@@ -434,20 +602,18 @@ void main() {
         displayName: '직원1',
         role: 'staff',
         email: 'staff1@internal.local',
-        pinHash: hashPin('5678', 'fixed-salt'),
+        pinHash: hashPin('567890', 'fixed-salt'),
         pinSalt: 'fixed-salt',
       ),
     );
 
-    final supabase = testSupabaseClient(httpClient: _ThrowingHttpClient());
-    addTearDown(supabase.dispose);
-
-    final repository = AuthRepository(supabase, db.cachedProfileDao);
+    final gateway = FakeAuthGateway(throwNetworkError: true);
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
 
     final result = await repository.login(
       id: 'user-2',
       email: 'staff1@internal.local',
-      pin: '5678',
+      pin: '567890',
     );
 
     expect(result.outcome, AuthOutcome.success);
@@ -463,20 +629,18 @@ void main() {
         displayName: '직원1',
         role: 'staff',
         email: 'staff1@internal.local',
-        pinHash: hashPin('5678', 'fixed-salt'),
+        pinHash: hashPin('567890', 'fixed-salt'),
         pinSalt: 'fixed-salt',
       ),
     );
 
-    final supabase = testSupabaseClient(httpClient: _ThrowingHttpClient());
-    addTearDown(supabase.dispose);
-
-    final repository = AuthRepository(supabase, db.cachedProfileDao);
+    final gateway = FakeAuthGateway(throwNetworkError: true);
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
 
     final result = await repository.login(
       id: 'user-2',
       email: 'staff1@internal.local',
-      pin: '0000',
+      pin: '000000',
     );
 
     expect(result.outcome, AuthOutcome.invalidPin);
@@ -485,15 +649,13 @@ void main() {
   test(
       'reports no offline cache when the device has never logged in '
       'before', () async {
-    final supabase = testSupabaseClient(httpClient: _ThrowingHttpClient());
-    addTearDown(supabase.dispose);
-
-    final repository = AuthRepository(supabase, db.cachedProfileDao);
+    final gateway = FakeAuthGateway(throwNetworkError: true);
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
 
     final result = await repository.login(
       id: 'user-3',
       email: 'staff2@internal.local',
-      pin: '1111',
+      pin: '111111',
     );
 
     expect(result.outcome, AuthOutcome.offlineNoCache);
@@ -502,14 +664,12 @@ void main() {
   test(
       'reports no offline cache when logging in without a known id at all '
       '(first login on a new device)', () async {
-    final supabase = testSupabaseClient(httpClient: _ThrowingHttpClient());
-    addTearDown(supabase.dispose);
-
-    final repository = AuthRepository(supabase, db.cachedProfileDao);
+    final gateway = FakeAuthGateway(throwNetworkError: true);
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
 
     final result = await repository.login(
       email: 'owner@internal.local',
-      pin: '1234',
+      pin: '123456',
     );
 
     expect(result.outcome, AuthOutcome.offlineNoCache);
@@ -517,12 +677,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행하여 실패 확인**
+- [ ] **Step 3: 테스트 실행하여 실패 확인**
 
 Run: `flutter test test/data/repositories/auth_repository_test.dart`
 Expected: FAIL — `lib/data/repositories/auth_repository.dart` 파일이 없어 컴파일 에러
 
-- [ ] **Step 3: 최소 구현 작성**
+- [ ] **Step 4: 최소 구현 작성**
 
 `lib/data/repositories/auth_repository.dart`:
 ```dart
@@ -531,6 +691,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/pin_hash.dart';
 import '../local/daos/cached_profile_dao.dart';
 import '../local/database.dart';
+import '../services/auth_gateway.dart';
 
 enum AuthOutcome { success, invalidPin, offlineNoCache }
 
@@ -549,9 +710,9 @@ class AuthResult {
 }
 
 class AuthRepository {
-  AuthRepository(this._supabase, this._cachedProfileDao);
+  AuthRepository(this._gateway, this._cachedProfileDao);
 
-  final SupabaseClient _supabase;
+  final AuthGateway _gateway;
   final CachedProfileDao _cachedProfileDao;
 
   Future<AuthResult> login({
@@ -560,20 +721,11 @@ class AuthRepository {
     required String pin,
   }) async {
     try {
-      final response = await _supabase.auth.signInWithPassword(
+      final user = await _gateway.signInWithPassword(
         email: email,
         password: pin,
       );
-      final user = response.user;
-      if (user == null) {
-        return AuthResult(outcome: AuthOutcome.invalidPin);
-      }
-
-      final profileRow = await _supabase
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .single();
+      final profileRow = await _gateway.fetchProfile(user.id);
       final displayName = profileRow['display_name'] as String;
       final role = profileRow['role'] as String;
 
@@ -619,15 +771,15 @@ class AuthRepository {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행하여 통과 확인**
+- [ ] **Step 5: 테스트 실행하여 통과 확인**
 
 Run: `flutter test test/data/repositories/auth_repository_test.dart`
 Expected: PASS (5 tests passed)
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add lib/data/repositories/auth_repository.dart test/data/repositories/auth_repository_test.dart
+git add lib/data/repositories/auth_repository.dart test/support/fake_auth_gateway.dart test/data/repositories/auth_repository_test.dart
 git commit -m "feat: add AuthRepository with online/offline PIN login"
 ```
 
@@ -654,24 +806,20 @@ git commit -m "feat: add AuthRepository with online/offline PIN login"
     final syntheticEmail =
         'staff-${DateTime.now().millisecondsSinceEpoch}@internal.local';
 
-    await _supabase.auth.signUp(email: syntheticEmail, password: pin);
-    final newUser = _supabase.auth.currentUser;
-    if (newUser == null) {
-      throw StateError('직원 계정 생성에 실패했습니다');
-    }
+    final newUser = await _gateway.signUp(
+      email: syntheticEmail,
+      password: pin,
+    );
 
-    await _supabase.from('profiles').insert({
-      'id': newUser.id,
-      'display_name': displayName,
-      'role': 'staff',
-    });
+    await _gateway.insertProfile(
+      id: newUser.id,
+      displayName: displayName,
+      role: 'staff',
+    );
 
     // signUp()이 세션을 방금 만든 직원 계정으로 바꿔버리므로, 사장 계정으로
     // 다시 로그인해서 세션을 복구한다.
-    await _supabase.auth.signInWithPassword(
-      email: ownerEmail,
-      password: ownerPin,
-    );
+    await _gateway.signInWithPassword(email: ownerEmail, password: ownerPin);
   }
 ```
 
@@ -697,6 +845,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/repositories/auth_repository.dart';
+import '../../data/services/auth_gateway.dart';
 import 'dao_providers.dart';
 
 class AuthSession {
@@ -732,7 +881,7 @@ final authSessionProvider =
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
-    Supabase.instance.client,
+    SupabaseAuthGateway(Supabase.instance.client),
     ref.watch(cachedProfileDaoProvider),
   );
 });
@@ -762,42 +911,33 @@ git commit -m "feat: add addStaff and auth session providers"
 
 `test/features/auth/login_screen_test.dart`:
 ```dart
-import 'dart:io';
-
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/data/repositories/auth_repository.dart';
 import 'package:stockcontrol/domain/pin_hash.dart';
 import 'package:stockcontrol/features/auth/login_screen.dart';
-import 'package:supabase_testing/supabase_testing.dart';
 
-class _ThrowingHttpClient extends http.BaseClient {
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    throw const SocketException('Simulated network failure');
-  }
-}
+import '../../support/fake_auth_gateway.dart';
 
 void main() {
   late AppDatabase db;
+  late FakeAuthGateway gateway;
   late ProviderContainer container;
 
   setUp(() {
     db = AppDatabase(NativeDatabase.memory());
-    final supabase = testSupabaseClient(httpClient: _ThrowingHttpClient());
-    addTearDown(supabase.dispose);
+    gateway = FakeAuthGateway(throwNetworkError: true);
 
     container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         authRepositoryProvider.overrideWithValue(
-          AuthRepository(supabase, db.cachedProfileDao),
+          AuthRepository(gateway, db.cachedProfileDao),
         ),
       ],
     );
@@ -821,7 +961,7 @@ void main() {
         displayName: '사장님',
         role: 'owner',
         email: 'owner@internal.local',
-        pinHash: hashPin('1234', 'salt'),
+        pinHash: hashPin('123456', 'salt'),
         pinSalt: 'salt',
       ),
     );
@@ -834,7 +974,7 @@ void main() {
     await tester.tap(find.text('사장님'));
     await tester.pump();
 
-    await tester.enterText(find.byKey(const Key('pinField')), '1234');
+    await tester.enterText(find.byKey(const Key('pinField')), '123456');
     await tester.tap(find.text('로그인'));
     await tester.pump();
     await tester.pump();
@@ -853,7 +993,7 @@ void main() {
         displayName: '사장님',
         role: 'owner',
         email: 'owner@internal.local',
-        pinHash: hashPin('1234', 'salt'),
+        pinHash: hashPin('123456', 'salt'),
         pinSalt: 'salt',
       ),
     );
@@ -864,7 +1004,7 @@ void main() {
     await tester.tap(find.text('사장님'));
     await tester.pump();
 
-    await tester.enterText(find.byKey(const Key('pinField')), '0000');
+    await tester.enterText(find.byKey(const Key('pinField')), '000000');
     await tester.tap(find.text('로그인'));
     await tester.pump();
     await tester.pump();
@@ -879,23 +1019,22 @@ void main() {
   testWidgets(
       'logs in via manual email entry when the device has no cached '
       'profiles yet (first login on a new device)', (tester) async {
-    // 이 테스트만 온라인 성공 시나리오라 별도의 mock 클라이언트를 쓴다
-    // (바깥 setUp의 컨테이너는 오프라인 전용 클라이언트를 쓰고 있음).
-    final httpClient = MockSupabaseHttpClient()
-      ..stubSignIn(
-        user: testUserJson(id: 'user-9', email: 'owner@internal.local'),
-      )
-      ..stubTable('profiles', rows: [
-        {'id': 'user-9', 'display_name': '사장님', 'role': 'owner'},
-      ]);
-    final onlineSupabase = testSupabaseClient(httpClient: httpClient);
-    addTearDown(onlineSupabase.dispose);
+    // 이 테스트만 온라인 성공 시나리오라 별도의 가짜 게이트웨이를 쓴다
+    // (바깥 setUp의 컨테이너는 네트워크 오류만 내는 게이트웨이를 쓰고 있음).
+    final onlineGateway = FakeAuthGateway()
+      ..seedUser(
+        id: 'user-9',
+        email: 'owner@internal.local',
+        password: '123456',
+        displayName: '사장님',
+        role: 'owner',
+      );
 
     final onlineContainer = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         authRepositoryProvider.overrideWithValue(
-          AuthRepository(onlineSupabase, db.cachedProfileDao),
+          AuthRepository(onlineGateway, db.cachedProfileDao),
         ),
       ],
     );
@@ -916,7 +1055,7 @@ void main() {
       find.byKey(const Key('emailField')),
       'owner@internal.local',
     );
-    await tester.enterText(find.byKey(const Key('manualPinField')), '1234');
+    await tester.enterText(find.byKey(const Key('manualPinField')), '123456');
     await tester.tap(find.text('로그인'));
     await tester.pump();
     await tester.pump();
@@ -1466,5 +1605,7 @@ Run: `flutter run -d windows` (또는 `flutter run -d chrome`)
 **스펙 커버리지**: Supabase Auth 설정(이메일 확인 끄기, 비밀번호 최소 길이) + `profiles` 테이블 — "사전 준비" 섹션(수동) / PIN 로그인(온라인) — Task 4 / PIN 로그인(오프라인 캐시 대체) — Task 3+4 / 세션 비유지(매번 재입력) — Task 6·8(별도 영속화 코드를 두지 않음으로써 자연히 만족) / 직원 추가 + 세션 복구 트릭 — Task 5·7 / role 기반 진입 경로 숨김 — Task 7 / 로그인 게이트 — Task 8 / 범위 밖 항목(재고 데이터 동기화, 마스터데이터 수정·삭제 잠금, PIN 찾기, 로그인 시도 제한) — 이번 계획에 포함하지 않음, 스펙과 일치.
 
 **타입 일관성 확인**: `AuthResult(outcome, userId, displayName, role)`과 `AuthOutcome{success, invalidPin, offlineNoCache}` — Task 4에서 정의된 게 Task 6(`LoginScreen`)의 분기 처리와 정확히 일치. `AuthRepository.login({id, email, pin})`과 `addStaff({displayName, pin, ownerEmail, ownerPin})` 시그니처가 Task 6·7의 호출부와 일치. `AuthSession(id, email, pin, displayName, role)` + `isOwner` 게터가 Task 6(세션 설정)과 Task 7(`owner.email`/`owner.pin` 사용, `session?.isOwner`)에서 동일하게 쓰임. `CachedProfiles` 테이블의 컬럼명(`id, displayName, role, email, pinHash, pinSalt`)이 Task 3의 DAO·테스트와 Task 4·6의 `CachedProfilesCompanion.insert(...)` 호출부에서 전부 일치.
+
+**실행 중 발견/반영한 변경사항 재확인**: `supabase_testing` 의존성 충돌로 Task 1~6을 `AuthGateway`/`SupabaseAuthGateway`/`FakeAuthGateway` 구조로 다시 썼다(위 "실행 중 발견한 변경사항" 참고). `AuthGateway`의 4개 메서드(`signInWithPassword`, `signUp`, `fetchProfile`, `insertProfile`)가 Task 1(인터페이스 정의) → Task 4(`AuthRepository`가 소비 + `FakeAuthGateway`가 구현) → Task 5(`SupabaseAuthGateway`가 실제 앱에서 주입) → Task 6(`FakeAuthGateway`를 위젯 테스트에서 재사용)까지 시그니처가 전부 일치. PIN 자릿수는 Supabase 대시보드의 비밀번호 최소 길이 제약(6 미만 불가)에 맞춰 4자리에서 6자리로 변경했고, 스펙·계획·화면 코드(`maxLength`, 에러 메시지)에 전부 반영했다.
 
 **초기 검토에서 발견하고 계획에 반영한 위험 요소**: "이름 목록이 로컬 캐시에서만 나온다"는 설계라면, 최초 실행 시(또는 새 기기에서) 로컬 캐시가 비어 있어 로그인 화면에 고를 이름이 하나도 없어서 아예 로그인을 못 하는 문제가 있었다. Task 6의 "이메일로 로그인" 경로(`_manualEntry`, `AuthRepository.login()`의 `id`를 선택적 파라미터로 변경)로 해결했다 — 이 경로는 이름 목록에 없는 사람(또는 이 기기에 처음 로그인하는 사람)도 이메일+PIN을 직접 입력해서 온라인으로 로그인할 수 있게 하고, 성공하면 그 즉시 로컬 캐시에 저장되어 다음부터는 이름 목록에 나타난다.
