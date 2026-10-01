@@ -73,7 +73,7 @@ alter table public.profiles
 ### 로컬 Drift 스키마
 
 - `Stores` 테이블(신규): `id`(text, PK, Supabase UUID), `name`(text) — 서버 데이터를 그대로 캐싱만 하는 읽기 전용 테이블
-- `Lots` 테이블: `storeId`(text, `Stores` 참조) 컬럼 추가
+- `Lots` 테이블: `storeId`(text, `Stores` 참조, **nullable**) 컬럼 추가 — `LotsCompanion.insert(...)`를 호출하는 기존 코드(입고 등록 화면, 3~6단계에서 만든 여러 테스트)가 이미 많아서, 지금 바로 필수값으로 만들면 이번 스펙의 범위를 벗어난 화면들까지 전부 고쳐야 한다. 매장 선택을 실제로 반영해서 항상 값이 채워지도록 하는 건 2차(화면 연동)의 몫이다.
 - `CachedProfiles` 테이블: `storeId`(text, nullable), `storeName`(text, nullable) 컬럼 추가 — 오프라인 상태에서도 "내가 어느 매장 소속인지" 보여줄 수 있도록
 - `schemaVersion`을 3으로 올리고, 이번엔 기존 데이터 보존용 `onUpgrade` 마이그레이션을 작성하지 않는다 — 대신 로컬 `stockcontrol.sqlite` 파일을 수동으로 삭제하고 앱을 다시 실행하라고 안내한다 (전제/결정 사항 참고).
 
