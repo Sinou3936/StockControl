@@ -14,9 +14,17 @@ class FakeAuthGateway implements AuthGateway {
     required String password,
     required String displayName,
     required String role,
+    String? storeId,
+    String? storeName,
   }) {
     _usersByEmail[email] = _FakeUser(id: id, password: password);
-    _profilesById[id] = {'id': id, 'display_name': displayName, 'role': role};
+    _profilesById[id] = {
+      'id': id,
+      'display_name': displayName,
+      'role': role,
+      'store_id': storeId,
+      'stores': storeName == null ? null : {'name': storeName},
+    };
   }
 
   @override
@@ -58,8 +66,15 @@ class FakeAuthGateway implements AuthGateway {
     required String id,
     required String displayName,
     required String role,
+    String? storeId,
   }) async {
-    _profilesById[id] = {'id': id, 'display_name': displayName, 'role': role};
+    _profilesById[id] = {
+      'id': id,
+      'display_name': displayName,
+      'role': role,
+      'store_id': storeId,
+      'stores': null,
+    };
   }
 }
 

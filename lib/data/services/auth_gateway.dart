@@ -23,6 +23,7 @@ abstract class AuthGateway {
     required String id,
     required String displayName,
     required String role,
+    String? storeId,
   });
 }
 
@@ -65,7 +66,11 @@ class SupabaseAuthGateway implements AuthGateway {
 
   @override
   Future<Map<String, dynamic>> fetchProfile(String userId) {
-    return _client.from('profiles').select().eq('id', userId).single();
+    return _client
+        .from('profiles')
+        .select('*, stores(name)')
+        .eq('id', userId)
+        .single();
   }
 
   @override
@@ -73,11 +78,13 @@ class SupabaseAuthGateway implements AuthGateway {
     required String id,
     required String displayName,
     required String role,
+    String? storeId,
   }) {
     return _client.from('profiles').insert({
       'id': id,
       'display_name': displayName,
       'role': role,
+      'store_id': storeId,
     });
   }
 }
