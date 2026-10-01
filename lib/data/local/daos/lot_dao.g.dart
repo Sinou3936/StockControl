@@ -6,6 +6,7 @@ part of 'lot_dao.dart';
 mixin _$LotDaoMixin on DatabaseAccessor<AppDatabase> {
   $IngredientsTable get ingredients => attachedDatabase.ingredients;
   $SuppliersTable get suppliers => attachedDatabase.suppliers;
+  $StoresTable get stores => attachedDatabase.stores;
   $LotsTable get lots => attachedDatabase.lots;
   LotDaoManager get managers => LotDaoManager(this);
 }
@@ -17,6 +18,8 @@ class LotDaoManager {
       $$IngredientsTableTableManager(_db.attachedDatabase, _db.ingredients);
   $$SuppliersTableTableManager get suppliers =>
       $$SuppliersTableTableManager(_db.attachedDatabase, _db.suppliers);
+  $$StoresTableTableManager get stores =>
+      $$StoresTableTableManager(_db.attachedDatabase, _db.stores);
   $$LotsTableTableManager get lots =>
       $$LotsTableTableManager(_db.attachedDatabase, _db.lots);
 }

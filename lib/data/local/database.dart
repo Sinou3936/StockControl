@@ -5,23 +5,33 @@ import 'daos/cached_profile_dao.dart';
 import 'daos/ingredient_dao.dart';
 import 'daos/lot_dao.dart';
 import 'daos/stock_movement_dao.dart';
+import 'daos/store_dao.dart';
 import 'daos/supplier_dao.dart';
 import 'tables/cached_profiles_table.dart';
 import 'tables/ingredients_table.dart';
 import 'tables/lots_table.dart';
 import 'tables/stock_movements_table.dart';
+import 'tables/stores_table.dart';
 import 'tables/suppliers_table.dart';
 
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Suppliers, Ingredients, Lots, StockMovements, CachedProfiles],
+  tables: [
+    Suppliers,
+    Ingredients,
+    Lots,
+    StockMovements,
+    CachedProfiles,
+    Stores,
+  ],
   daos: [
     SupplierDao,
     IngredientDao,
     LotDao,
     StockMovementDao,
     CachedProfileDao,
+    StoreDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -29,7 +39,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? driftDatabase(name: 'stockcontrol'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

@@ -916,6 +916,208 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
   }
 }
 
+class $StoresTable extends Stores with TableInfo<$StoresTable, Store> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StoresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stores';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Store> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Store map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Store(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  $StoresTable createAlias(String alias) {
+    return $StoresTable(attachedDatabase, alias);
+  }
+}
+
+class Store extends DataClass implements Insertable<Store> {
+  final String id;
+  final String name;
+  const Store({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  StoresCompanion toCompanion(bool nullToAbsent) {
+    return StoresCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory Store.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Store(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  Store copyWith({String? id, String? name}) =>
+      Store(id: id ?? this.id, name: name ?? this.name);
+  Store copyWithCompanion(StoresCompanion data) {
+    return Store(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Store(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Store && other.id == this.id && other.name == this.name);
+}
+
+class StoresCompanion extends UpdateCompanion<Store> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const StoresCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StoresCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<Store> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StoresCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return StoresCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StoresCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -960,6 +1162,20 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES suppliers (id)',
+    ),
+  );
+  static const VerificationMeta _storeIdMeta = const VerificationMeta(
+    'storeId',
+  );
+  @override
+  late final GeneratedColumn<String> storeId = GeneratedColumn<String>(
+    'store_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES stores (id)',
     ),
   );
   static const VerificationMeta _receivedDateMeta = const VerificationMeta(
@@ -1023,6 +1239,7 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
     id,
     ingredientId,
     supplierId,
+    storeId,
     receivedDate,
     expiryDate,
     unitCost,
@@ -1059,6 +1276,12 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
       context.handle(
         _supplierIdMeta,
         supplierId.isAcceptableOrUnknown(data['supplier_id']!, _supplierIdMeta),
+      );
+    }
+    if (data.containsKey('store_id')) {
+      context.handle(
+        _storeIdMeta,
+        storeId.isAcceptableOrUnknown(data['store_id']!, _storeIdMeta),
       );
     }
     if (data.containsKey('received_date')) {
@@ -1124,6 +1347,10 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
         DriftSqlType.int,
         data['${effectivePrefix}supplier_id'],
       ),
+      storeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store_id'],
+      ),
       receivedDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}received_date'],
@@ -1157,6 +1384,7 @@ class Lot extends DataClass implements Insertable<Lot> {
   final int id;
   final int ingredientId;
   final int? supplierId;
+  final String? storeId;
   final DateTime receivedDate;
   final DateTime? expiryDate;
   final double unitCost;
@@ -1166,6 +1394,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     required this.id,
     required this.ingredientId,
     this.supplierId,
+    this.storeId,
     required this.receivedDate,
     this.expiryDate,
     required this.unitCost,
@@ -1179,6 +1408,9 @@ class Lot extends DataClass implements Insertable<Lot> {
     map['ingredient_id'] = Variable<int>(ingredientId);
     if (!nullToAbsent || supplierId != null) {
       map['supplier_id'] = Variable<int>(supplierId);
+    }
+    if (!nullToAbsent || storeId != null) {
+      map['store_id'] = Variable<String>(storeId);
     }
     map['received_date'] = Variable<DateTime>(receivedDate);
     if (!nullToAbsent || expiryDate != null) {
@@ -1197,6 +1429,9 @@ class Lot extends DataClass implements Insertable<Lot> {
       supplierId: supplierId == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierId),
+      storeId: storeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storeId),
       receivedDate: Value(receivedDate),
       expiryDate: expiryDate == null && nullToAbsent
           ? const Value.absent()
@@ -1216,6 +1451,7 @@ class Lot extends DataClass implements Insertable<Lot> {
       id: serializer.fromJson<int>(json['id']),
       ingredientId: serializer.fromJson<int>(json['ingredientId']),
       supplierId: serializer.fromJson<int?>(json['supplierId']),
+      storeId: serializer.fromJson<String?>(json['storeId']),
       receivedDate: serializer.fromJson<DateTime>(json['receivedDate']),
       expiryDate: serializer.fromJson<DateTime?>(json['expiryDate']),
       unitCost: serializer.fromJson<double>(json['unitCost']),
@@ -1230,6 +1466,7 @@ class Lot extends DataClass implements Insertable<Lot> {
       'id': serializer.toJson<int>(id),
       'ingredientId': serializer.toJson<int>(ingredientId),
       'supplierId': serializer.toJson<int?>(supplierId),
+      'storeId': serializer.toJson<String?>(storeId),
       'receivedDate': serializer.toJson<DateTime>(receivedDate),
       'expiryDate': serializer.toJson<DateTime?>(expiryDate),
       'unitCost': serializer.toJson<double>(unitCost),
@@ -1242,6 +1479,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     int? id,
     int? ingredientId,
     Value<int?> supplierId = const Value.absent(),
+    Value<String?> storeId = const Value.absent(),
     DateTime? receivedDate,
     Value<DateTime?> expiryDate = const Value.absent(),
     double? unitCost,
@@ -1251,6 +1489,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     id: id ?? this.id,
     ingredientId: ingredientId ?? this.ingredientId,
     supplierId: supplierId.present ? supplierId.value : this.supplierId,
+    storeId: storeId.present ? storeId.value : this.storeId,
     receivedDate: receivedDate ?? this.receivedDate,
     expiryDate: expiryDate.present ? expiryDate.value : this.expiryDate,
     unitCost: unitCost ?? this.unitCost,
@@ -1266,6 +1505,7 @@ class Lot extends DataClass implements Insertable<Lot> {
       supplierId: data.supplierId.present
           ? data.supplierId.value
           : this.supplierId,
+      storeId: data.storeId.present ? data.storeId.value : this.storeId,
       receivedDate: data.receivedDate.present
           ? data.receivedDate.value
           : this.receivedDate,
@@ -1286,6 +1526,7 @@ class Lot extends DataClass implements Insertable<Lot> {
           ..write('id: $id, ')
           ..write('ingredientId: $ingredientId, ')
           ..write('supplierId: $supplierId, ')
+          ..write('storeId: $storeId, ')
           ..write('receivedDate: $receivedDate, ')
           ..write('expiryDate: $expiryDate, ')
           ..write('unitCost: $unitCost, ')
@@ -1300,6 +1541,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     id,
     ingredientId,
     supplierId,
+    storeId,
     receivedDate,
     expiryDate,
     unitCost,
@@ -1313,6 +1555,7 @@ class Lot extends DataClass implements Insertable<Lot> {
           other.id == this.id &&
           other.ingredientId == this.ingredientId &&
           other.supplierId == this.supplierId &&
+          other.storeId == this.storeId &&
           other.receivedDate == this.receivedDate &&
           other.expiryDate == this.expiryDate &&
           other.unitCost == this.unitCost &&
@@ -1324,6 +1567,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
   final Value<int> id;
   final Value<int> ingredientId;
   final Value<int?> supplierId;
+  final Value<String?> storeId;
   final Value<DateTime> receivedDate;
   final Value<DateTime?> expiryDate;
   final Value<double> unitCost;
@@ -1333,6 +1577,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     this.id = const Value.absent(),
     this.ingredientId = const Value.absent(),
     this.supplierId = const Value.absent(),
+    this.storeId = const Value.absent(),
     this.receivedDate = const Value.absent(),
     this.expiryDate = const Value.absent(),
     this.unitCost = const Value.absent(),
@@ -1343,6 +1588,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     this.id = const Value.absent(),
     required int ingredientId,
     this.supplierId = const Value.absent(),
+    this.storeId = const Value.absent(),
     required DateTime receivedDate,
     this.expiryDate = const Value.absent(),
     required double unitCost,
@@ -1356,6 +1602,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     Expression<int>? id,
     Expression<int>? ingredientId,
     Expression<int>? supplierId,
+    Expression<String>? storeId,
     Expression<DateTime>? receivedDate,
     Expression<DateTime>? expiryDate,
     Expression<double>? unitCost,
@@ -1366,6 +1613,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
       if (id != null) 'id': id,
       if (ingredientId != null) 'ingredient_id': ingredientId,
       if (supplierId != null) 'supplier_id': supplierId,
+      if (storeId != null) 'store_id': storeId,
       if (receivedDate != null) 'received_date': receivedDate,
       if (expiryDate != null) 'expiry_date': expiryDate,
       if (unitCost != null) 'unit_cost': unitCost,
@@ -1378,6 +1626,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     Value<int>? id,
     Value<int>? ingredientId,
     Value<int?>? supplierId,
+    Value<String?>? storeId,
     Value<DateTime>? receivedDate,
     Value<DateTime?>? expiryDate,
     Value<double>? unitCost,
@@ -1388,6 +1637,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
       id: id ?? this.id,
       ingredientId: ingredientId ?? this.ingredientId,
       supplierId: supplierId ?? this.supplierId,
+      storeId: storeId ?? this.storeId,
       receivedDate: receivedDate ?? this.receivedDate,
       expiryDate: expiryDate ?? this.expiryDate,
       unitCost: unitCost ?? this.unitCost,
@@ -1407,6 +1657,9 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     }
     if (supplierId.present) {
       map['supplier_id'] = Variable<int>(supplierId.value);
+    }
+    if (storeId.present) {
+      map['store_id'] = Variable<String>(storeId.value);
     }
     if (receivedDate.present) {
       map['received_date'] = Variable<DateTime>(receivedDate.value);
@@ -1432,6 +1685,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
           ..write('id: $id, ')
           ..write('ingredientId: $ingredientId, ')
           ..write('supplierId: $supplierId, ')
+          ..write('storeId: $storeId, ')
           ..write('receivedDate: $receivedDate, ')
           ..write('expiryDate: $expiryDate, ')
           ..write('unitCost: $unitCost, ')
@@ -1951,6 +2205,28 @@ class $CachedProfilesTable extends CachedProfiles
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _storeIdMeta = const VerificationMeta(
+    'storeId',
+  );
+  @override
+  late final GeneratedColumn<String> storeId = GeneratedColumn<String>(
+    'store_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _storeNameMeta = const VerificationMeta(
+    'storeName',
+  );
+  @override
+  late final GeneratedColumn<String> storeName = GeneratedColumn<String>(
+    'store_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1959,6 +2235,8 @@ class $CachedProfilesTable extends CachedProfiles
     email,
     pinHash,
     pinSalt,
+    storeId,
+    storeName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2020,6 +2298,18 @@ class $CachedProfilesTable extends CachedProfiles
     } else if (isInserting) {
       context.missing(_pinSaltMeta);
     }
+    if (data.containsKey('store_id')) {
+      context.handle(
+        _storeIdMeta,
+        storeId.isAcceptableOrUnknown(data['store_id']!, _storeIdMeta),
+      );
+    }
+    if (data.containsKey('store_name')) {
+      context.handle(
+        _storeNameMeta,
+        storeName.isAcceptableOrUnknown(data['store_name']!, _storeNameMeta),
+      );
+    }
     return context;
   }
 
@@ -2053,6 +2343,14 @@ class $CachedProfilesTable extends CachedProfiles
         DriftSqlType.string,
         data['${effectivePrefix}pin_salt'],
       )!,
+      storeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store_id'],
+      ),
+      storeName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store_name'],
+      ),
     );
   }
 
@@ -2069,6 +2367,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
   final String email;
   final String pinHash;
   final String pinSalt;
+  final String? storeId;
+  final String? storeName;
   const CachedProfile({
     required this.id,
     required this.displayName,
@@ -2076,6 +2376,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     required this.email,
     required this.pinHash,
     required this.pinSalt,
+    this.storeId,
+    this.storeName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2086,6 +2388,12 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     map['email'] = Variable<String>(email);
     map['pin_hash'] = Variable<String>(pinHash);
     map['pin_salt'] = Variable<String>(pinSalt);
+    if (!nullToAbsent || storeId != null) {
+      map['store_id'] = Variable<String>(storeId);
+    }
+    if (!nullToAbsent || storeName != null) {
+      map['store_name'] = Variable<String>(storeName);
+    }
     return map;
   }
 
@@ -2097,6 +2405,12 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       email: Value(email),
       pinHash: Value(pinHash),
       pinSalt: Value(pinSalt),
+      storeId: storeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storeId),
+      storeName: storeName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storeName),
     );
   }
 
@@ -2112,6 +2426,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       email: serializer.fromJson<String>(json['email']),
       pinHash: serializer.fromJson<String>(json['pinHash']),
       pinSalt: serializer.fromJson<String>(json['pinSalt']),
+      storeId: serializer.fromJson<String?>(json['storeId']),
+      storeName: serializer.fromJson<String?>(json['storeName']),
     );
   }
   @override
@@ -2124,6 +2440,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       'email': serializer.toJson<String>(email),
       'pinHash': serializer.toJson<String>(pinHash),
       'pinSalt': serializer.toJson<String>(pinSalt),
+      'storeId': serializer.toJson<String?>(storeId),
+      'storeName': serializer.toJson<String?>(storeName),
     };
   }
 
@@ -2134,6 +2452,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     String? email,
     String? pinHash,
     String? pinSalt,
+    Value<String?> storeId = const Value.absent(),
+    Value<String?> storeName = const Value.absent(),
   }) => CachedProfile(
     id: id ?? this.id,
     displayName: displayName ?? this.displayName,
@@ -2141,6 +2461,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
     email: email ?? this.email,
     pinHash: pinHash ?? this.pinHash,
     pinSalt: pinSalt ?? this.pinSalt,
+    storeId: storeId.present ? storeId.value : this.storeId,
+    storeName: storeName.present ? storeName.value : this.storeName,
   );
   CachedProfile copyWithCompanion(CachedProfilesCompanion data) {
     return CachedProfile(
@@ -2152,6 +2474,8 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
       email: data.email.present ? data.email.value : this.email,
       pinHash: data.pinHash.present ? data.pinHash.value : this.pinHash,
       pinSalt: data.pinSalt.present ? data.pinSalt.value : this.pinSalt,
+      storeId: data.storeId.present ? data.storeId.value : this.storeId,
+      storeName: data.storeName.present ? data.storeName.value : this.storeName,
     );
   }
 
@@ -2163,14 +2487,24 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
           ..write('role: $role, ')
           ..write('email: $email, ')
           ..write('pinHash: $pinHash, ')
-          ..write('pinSalt: $pinSalt')
+          ..write('pinSalt: $pinSalt, ')
+          ..write('storeId: $storeId, ')
+          ..write('storeName: $storeName')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, displayName, role, email, pinHash, pinSalt);
+  int get hashCode => Object.hash(
+    id,
+    displayName,
+    role,
+    email,
+    pinHash,
+    pinSalt,
+    storeId,
+    storeName,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2180,7 +2514,9 @@ class CachedProfile extends DataClass implements Insertable<CachedProfile> {
           other.role == this.role &&
           other.email == this.email &&
           other.pinHash == this.pinHash &&
-          other.pinSalt == this.pinSalt);
+          other.pinSalt == this.pinSalt &&
+          other.storeId == this.storeId &&
+          other.storeName == this.storeName);
 }
 
 class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
@@ -2190,6 +2526,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
   final Value<String> email;
   final Value<String> pinHash;
   final Value<String> pinSalt;
+  final Value<String?> storeId;
+  final Value<String?> storeName;
   final Value<int> rowid;
   const CachedProfilesCompanion({
     this.id = const Value.absent(),
@@ -2198,6 +2536,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     this.email = const Value.absent(),
     this.pinHash = const Value.absent(),
     this.pinSalt = const Value.absent(),
+    this.storeId = const Value.absent(),
+    this.storeName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CachedProfilesCompanion.insert({
@@ -2207,6 +2547,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     required String email,
     required String pinHash,
     required String pinSalt,
+    this.storeId = const Value.absent(),
+    this.storeName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        displayName = Value(displayName),
@@ -2221,6 +2563,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     Expression<String>? email,
     Expression<String>? pinHash,
     Expression<String>? pinSalt,
+    Expression<String>? storeId,
+    Expression<String>? storeName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2230,6 +2574,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
       if (email != null) 'email': email,
       if (pinHash != null) 'pin_hash': pinHash,
       if (pinSalt != null) 'pin_salt': pinSalt,
+      if (storeId != null) 'store_id': storeId,
+      if (storeName != null) 'store_name': storeName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2241,6 +2587,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     Value<String>? email,
     Value<String>? pinHash,
     Value<String>? pinSalt,
+    Value<String?>? storeId,
+    Value<String?>? storeName,
     Value<int>? rowid,
   }) {
     return CachedProfilesCompanion(
@@ -2250,6 +2598,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
       email: email ?? this.email,
       pinHash: pinHash ?? this.pinHash,
       pinSalt: pinSalt ?? this.pinSalt,
+      storeId: storeId ?? this.storeId,
+      storeName: storeName ?? this.storeName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2275,6 +2625,12 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
     if (pinSalt.present) {
       map['pin_salt'] = Variable<String>(pinSalt.value);
     }
+    if (storeId.present) {
+      map['store_id'] = Variable<String>(storeId.value);
+    }
+    if (storeName.present) {
+      map['store_name'] = Variable<String>(storeName.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2290,6 +2646,8 @@ class CachedProfilesCompanion extends UpdateCompanion<CachedProfile> {
           ..write('email: $email, ')
           ..write('pinHash: $pinHash, ')
           ..write('pinSalt: $pinSalt, ')
+          ..write('storeId: $storeId, ')
+          ..write('storeName: $storeName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2301,6 +2659,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $SuppliersTable suppliers = $SuppliersTable(this);
   late final $IngredientsTable ingredients = $IngredientsTable(this);
+  late final $StoresTable stores = $StoresTable(this);
   late final $LotsTable lots = $LotsTable(this);
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
   late final $CachedProfilesTable cachedProfiles = $CachedProfilesTable(this);
@@ -2313,6 +2672,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final CachedProfileDao cachedProfileDao = CachedProfileDao(
     this as AppDatabase,
   );
+  late final StoreDao storeDao = StoreDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2320,6 +2680,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     suppliers,
     ingredients,
+    stores,
     lots,
     stockMovements,
     cachedProfiles,
@@ -2992,11 +3353,240 @@ typedef $$IngredientsTableProcessedTableManager =
       Ingredient,
       PrefetchHooks Function({bool lotsRefs})
     >;
+typedef $$StoresTableCreateCompanionBuilder =
+    StoresCompanion Function({
+      required String id,
+      required String name,
+      Value<int> rowid,
+    });
+typedef $$StoresTableUpdateCompanionBuilder =
+    StoresCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> rowid,
+    });
+
+final class $$StoresTableReferences
+    extends BaseReferences<_$AppDatabase, $StoresTable, Store> {
+  $$StoresTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$LotsTable, List<Lot>> _lotsRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.lots,
+    aliasName: 'stores__id__lots__store_id',
+  );
+
+  $$LotsTableProcessedTableManager get lotsRefs {
+    final manager = $$LotsTableTableManager(
+      $_db,
+      $_db.lots,
+    ).filter((f) => f.storeId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_lotsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$StoresTableFilterComposer
+    extends Composer<_$AppDatabase, $StoresTable> {
+  $$StoresTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> lotsRefs(
+    Expression<bool> Function($$LotsTableFilterComposer f) f,
+  ) {
+    final $$LotsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.lots,
+      getReferencedColumn: (t) => t.storeId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LotsTableFilterComposer(
+            $db: $db,
+            $table: $db.lots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$StoresTableOrderingComposer
+    extends Composer<_$AppDatabase, $StoresTable> {
+  $$StoresTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StoresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StoresTable> {
+  $$StoresTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  Expression<T> lotsRefs<T extends Object>(
+    Expression<T> Function($$LotsTableAnnotationComposer a) f,
+  ) {
+    final $$LotsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.lots,
+      getReferencedColumn: (t) => t.storeId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$LotsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.lots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$StoresTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StoresTable,
+          Store,
+          $$StoresTableFilterComposer,
+          $$StoresTableOrderingComposer,
+          $$StoresTableAnnotationComposer,
+          $$StoresTableCreateCompanionBuilder,
+          $$StoresTableUpdateCompanionBuilder,
+          (Store, $$StoresTableReferences),
+          Store,
+          PrefetchHooks Function({bool lotsRefs})
+        > {
+  $$StoresTableTableManager(_$AppDatabase db, $StoresTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StoresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StoresTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StoresTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StoresCompanion(id: id, name: name, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<int> rowid = const Value.absent(),
+              }) => StoresCompanion.insert(id: id, name: name, rowid: rowid),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) =>
+                    (e.readTable(table), $$StoresTableReferences(db, table, e)),
+              )
+              .toList(),
+          prefetchHooksCallback: ({lotsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (lotsRefs) db.lots],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (lotsRefs)
+                    await $_getPrefetchedData<Store, $StoresTable, Lot>(
+                      currentTable: table,
+                      referencedTable: $$StoresTableReferences._lotsRefsTable(
+                        db,
+                      ),
+                      managerFromTypedResult: (p0) =>
+                          $$StoresTableReferences(db, table, p0).lotsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.storeId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$StoresTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StoresTable,
+      Store,
+      $$StoresTableFilterComposer,
+      $$StoresTableOrderingComposer,
+      $$StoresTableAnnotationComposer,
+      $$StoresTableCreateCompanionBuilder,
+      $$StoresTableUpdateCompanionBuilder,
+      (Store, $$StoresTableReferences),
+      Store,
+      PrefetchHooks Function({bool lotsRefs})
+    >;
 typedef $$LotsTableCreateCompanionBuilder =
     LotsCompanion Function({
       Value<int> id,
       required int ingredientId,
       Value<int?> supplierId,
+      Value<String?> storeId,
       required DateTime receivedDate,
       Value<DateTime?> expiryDate,
       required double unitCost,
@@ -3008,6 +3598,7 @@ typedef $$LotsTableUpdateCompanionBuilder =
       Value<int> id,
       Value<int> ingredientId,
       Value<int?> supplierId,
+      Value<String?> storeId,
       Value<DateTime> receivedDate,
       Value<DateTime?> expiryDate,
       Value<double> unitCost,
@@ -3047,6 +3638,23 @@ final class $$LotsTableReferences
       $_db.suppliers,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_supplierIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $StoresTable _storeIdTable(_$AppDatabase db) =>
+      db.stores.createAlias('lots__store_id__stores__id');
+
+  $$StoresTableProcessedTableManager? get storeId {
+    final $_column = $_itemColumn<String>('store_id');
+    if ($_column == null) return null;
+    final manager = $$StoresTableTableManager(
+      $_db,
+      $_db.stores,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_storeIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -3147,6 +3755,29 @@ class $$LotsTableFilterComposer extends Composer<_$AppDatabase, $LotsTable> {
           }) => $$SuppliersTableFilterComposer(
             $db: $db,
             $table: $db.suppliers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$StoresTableFilterComposer get storeId {
+    final $$StoresTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.storeId,
+      referencedTable: $db.stores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StoresTableFilterComposer(
+            $db: $db,
+            $table: $db.stores,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3265,6 +3896,29 @@ class $$LotsTableOrderingComposer extends Composer<_$AppDatabase, $LotsTable> {
     );
     return composer;
   }
+
+  $$StoresTableOrderingComposer get storeId {
+    final $$StoresTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.storeId,
+      referencedTable: $db.stores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StoresTableOrderingComposer(
+            $db: $db,
+            $table: $db.stores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$LotsTableAnnotationComposer
@@ -3346,6 +4000,29 @@ class $$LotsTableAnnotationComposer
     return composer;
   }
 
+  $$StoresTableAnnotationComposer get storeId {
+    final $$StoresTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.storeId,
+      referencedTable: $db.stores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StoresTableAnnotationComposer(
+            $db: $db,
+            $table: $db.stores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> stockMovementsRefs<T extends Object>(
     Expression<T> Function($$StockMovementsTableAnnotationComposer a) f,
   ) {
@@ -3388,6 +4065,7 @@ class $$LotsTableTableManager
           PrefetchHooks Function({
             bool ingredientId,
             bool supplierId,
+            bool storeId,
             bool stockMovementsRefs,
           })
         > {
@@ -3407,6 +4085,7 @@ class $$LotsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> ingredientId = const Value.absent(),
                 Value<int?> supplierId = const Value.absent(),
+                Value<String?> storeId = const Value.absent(),
                 Value<DateTime> receivedDate = const Value.absent(),
                 Value<DateTime?> expiryDate = const Value.absent(),
                 Value<double> unitCost = const Value.absent(),
@@ -3416,6 +4095,7 @@ class $$LotsTableTableManager
                 id: id,
                 ingredientId: ingredientId,
                 supplierId: supplierId,
+                storeId: storeId,
                 receivedDate: receivedDate,
                 expiryDate: expiryDate,
                 unitCost: unitCost,
@@ -3427,6 +4107,7 @@ class $$LotsTableTableManager
                 Value<int> id = const Value.absent(),
                 required int ingredientId,
                 Value<int?> supplierId = const Value.absent(),
+                Value<String?> storeId = const Value.absent(),
                 required DateTime receivedDate,
                 Value<DateTime?> expiryDate = const Value.absent(),
                 required double unitCost,
@@ -3436,6 +4117,7 @@ class $$LotsTableTableManager
                 id: id,
                 ingredientId: ingredientId,
                 supplierId: supplierId,
+                storeId: storeId,
                 receivedDate: receivedDate,
                 expiryDate: expiryDate,
                 unitCost: unitCost,
@@ -3452,6 +4134,7 @@ class $$LotsTableTableManager
               ({
                 ingredientId = false,
                 supplierId = false,
+                storeId = false,
                 stockMovementsRefs = false,
               }) {
                 return PrefetchHooks(
@@ -3497,6 +4180,19 @@ class $$LotsTableTableManager
                                         ._supplierIdTable(db),
                                     referencedColumn: $$LotsTableReferences
                                         ._supplierIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (storeId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.storeId,
+                                    referencedTable: $$LotsTableReferences
+                                        ._storeIdTable(db),
+                                    referencedColumn: $$LotsTableReferences
+                                        ._storeIdTable(db)
                                         .id,
                                   )
                                   as T;
@@ -3549,6 +4245,7 @@ typedef $$LotsTableProcessedTableManager =
       PrefetchHooks Function({
         bool ingredientId,
         bool supplierId,
+        bool storeId,
         bool stockMovementsRefs,
       })
     >;
@@ -3918,6 +4615,8 @@ typedef $$CachedProfilesTableCreateCompanionBuilder =
       required String email,
       required String pinHash,
       required String pinSalt,
+      Value<String?> storeId,
+      Value<String?> storeName,
       Value<int> rowid,
     });
 typedef $$CachedProfilesTableUpdateCompanionBuilder =
@@ -3928,6 +4627,8 @@ typedef $$CachedProfilesTableUpdateCompanionBuilder =
       Value<String> email,
       Value<String> pinHash,
       Value<String> pinSalt,
+      Value<String?> storeId,
+      Value<String?> storeName,
       Value<int> rowid,
     });
 
@@ -3967,6 +4668,16 @@ class $$CachedProfilesTableFilterComposer
 
   ColumnFilters<String> get pinSalt => $composableBuilder(
     column: $table.pinSalt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storeName => $composableBuilder(
+    column: $table.storeName,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4009,6 +4720,16 @@ class $$CachedProfilesTableOrderingComposer
     column: $table.pinSalt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get storeName => $composableBuilder(
+    column: $table.storeName,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CachedProfilesTableAnnotationComposer
@@ -4039,6 +4760,12 @@ class $$CachedProfilesTableAnnotationComposer
 
   GeneratedColumn<String> get pinSalt =>
       $composableBuilder(column: $table.pinSalt, builder: (column) => column);
+
+  GeneratedColumn<String> get storeId =>
+      $composableBuilder(column: $table.storeId, builder: (column) => column);
+
+  GeneratedColumn<String> get storeName =>
+      $composableBuilder(column: $table.storeName, builder: (column) => column);
 }
 
 class $$CachedProfilesTableTableManager
@@ -4080,6 +4807,8 @@ class $$CachedProfilesTableTableManager
                 Value<String> email = const Value.absent(),
                 Value<String> pinHash = const Value.absent(),
                 Value<String> pinSalt = const Value.absent(),
+                Value<String?> storeId = const Value.absent(),
+                Value<String?> storeName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedProfilesCompanion(
                 id: id,
@@ -4088,6 +4817,8 @@ class $$CachedProfilesTableTableManager
                 email: email,
                 pinHash: pinHash,
                 pinSalt: pinSalt,
+                storeId: storeId,
+                storeName: storeName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4098,6 +4829,8 @@ class $$CachedProfilesTableTableManager
                 required String email,
                 required String pinHash,
                 required String pinSalt,
+                Value<String?> storeId = const Value.absent(),
+                Value<String?> storeName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CachedProfilesCompanion.insert(
                 id: id,
@@ -4106,6 +4839,8 @@ class $$CachedProfilesTableTableManager
                 email: email,
                 pinHash: pinHash,
                 pinSalt: pinSalt,
+                storeId: storeId,
+                storeName: storeName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4141,6 +4876,8 @@ class $AppDatabaseManager {
       $$SuppliersTableTableManager(_db, _db.suppliers);
   $$IngredientsTableTableManager get ingredients =>
       $$IngredientsTableTableManager(_db, _db.ingredients);
+  $$StoresTableTableManager get stores =>
+      $$StoresTableTableManager(_db, _db.stores);
   $$LotsTableTableManager get lots => $$LotsTableTableManager(_db, _db.lots);
   $$StockMovementsTableTableManager get stockMovements =>
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
