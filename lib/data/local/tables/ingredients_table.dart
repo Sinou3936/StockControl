@@ -9,5 +9,6 @@ class Ingredients extends Table {
   RealColumn get conversionFactor => real()();
   BoolColumn get isExpiryTracked => boolean()();
   RealColumn get safetyStockQty => real().nullable()();
+  TextColumn get syncId => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

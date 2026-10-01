@@ -5,5 +5,6 @@ class Suppliers extends Table {
   TextColumn get name => text()();
   TextColumn get contact => text().nullable()();
   TextColumn get memo => text().nullable()();
+  TextColumn get syncId => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

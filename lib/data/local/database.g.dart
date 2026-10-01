@@ -51,6 +51,15 @@ class $SuppliersTable extends Suppliers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+    'sync_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -64,7 +73,14 @@ class $SuppliersTable extends Suppliers
     defaultValue: currentDateAndTime,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, contact, memo, createdAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    contact,
+    memo,
+    syncId,
+    createdAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -100,6 +116,12 @@ class $SuppliersTable extends Suppliers
         memo.isAcceptableOrUnknown(data['memo']!, _memoMeta),
       );
     }
+    if (data.containsKey('sync_id')) {
+      context.handle(
+        _syncIdMeta,
+        syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -131,6 +153,10 @@ class $SuppliersTable extends Suppliers
         DriftSqlType.string,
         data['${effectivePrefix}memo'],
       ),
+      syncId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -149,12 +175,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
   final String name;
   final String? contact;
   final String? memo;
+  final String? syncId;
   final DateTime createdAt;
   const Supplier({
     required this.id,
     required this.name,
     this.contact,
     this.memo,
+    this.syncId,
     required this.createdAt,
   });
   @override
@@ -168,6 +196,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     if (!nullToAbsent || memo != null) {
       map['memo'] = Variable<String>(memo);
     }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -180,6 +211,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ? const Value.absent()
           : Value(contact),
       memo: memo == null && nullToAbsent ? const Value.absent() : Value(memo),
+      syncId: syncId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncId),
       createdAt: Value(createdAt),
     );
   }
@@ -194,6 +228,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       name: serializer.fromJson<String>(json['name']),
       contact: serializer.fromJson<String?>(json['contact']),
       memo: serializer.fromJson<String?>(json['memo']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -205,6 +240,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       'name': serializer.toJson<String>(name),
       'contact': serializer.toJson<String?>(contact),
       'memo': serializer.toJson<String?>(memo),
+      'syncId': serializer.toJson<String?>(syncId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -214,12 +250,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     String? name,
     Value<String?> contact = const Value.absent(),
     Value<String?> memo = const Value.absent(),
+    Value<String?> syncId = const Value.absent(),
     DateTime? createdAt,
   }) => Supplier(
     id: id ?? this.id,
     name: name ?? this.name,
     contact: contact.present ? contact.value : this.contact,
     memo: memo.present ? memo.value : this.memo,
+    syncId: syncId.present ? syncId.value : this.syncId,
     createdAt: createdAt ?? this.createdAt,
   );
   Supplier copyWithCompanion(SuppliersCompanion data) {
@@ -228,6 +266,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       name: data.name.present ? data.name.value : this.name,
       contact: data.contact.present ? data.contact.value : this.contact,
       memo: data.memo.present ? data.memo.value : this.memo,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -239,13 +278,14 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ..write('name: $name, ')
           ..write('contact: $contact, ')
           ..write('memo: $memo, ')
+          ..write('syncId: $syncId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, contact, memo, createdAt);
+  int get hashCode => Object.hash(id, name, contact, memo, syncId, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -254,6 +294,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           other.name == this.name &&
           other.contact == this.contact &&
           other.memo == this.memo &&
+          other.syncId == this.syncId &&
           other.createdAt == this.createdAt);
 }
 
@@ -262,12 +303,14 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
   final Value<String> name;
   final Value<String?> contact;
   final Value<String?> memo;
+  final Value<String?> syncId;
   final Value<DateTime> createdAt;
   const SuppliersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.contact = const Value.absent(),
     this.memo = const Value.absent(),
+    this.syncId = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   SuppliersCompanion.insert({
@@ -275,6 +318,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     required String name,
     this.contact = const Value.absent(),
     this.memo = const Value.absent(),
+    this.syncId = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Supplier> custom({
@@ -282,6 +326,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Expression<String>? name,
     Expression<String>? contact,
     Expression<String>? memo,
+    Expression<String>? syncId,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -289,6 +334,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       if (name != null) 'name': name,
       if (contact != null) 'contact': contact,
       if (memo != null) 'memo': memo,
+      if (syncId != null) 'sync_id': syncId,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -298,6 +344,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Value<String>? name,
     Value<String?>? contact,
     Value<String?>? memo,
+    Value<String?>? syncId,
     Value<DateTime>? createdAt,
   }) {
     return SuppliersCompanion(
@@ -305,6 +352,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       name: name ?? this.name,
       contact: contact ?? this.contact,
       memo: memo ?? this.memo,
+      syncId: syncId ?? this.syncId,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -324,6 +372,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     if (memo.present) {
       map['memo'] = Variable<String>(memo.value);
     }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -337,6 +388,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
           ..write('name: $name, ')
           ..write('contact: $contact, ')
           ..write('memo: $memo, ')
+          ..write('syncId: $syncId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -440,6 +492,15 @@ class $IngredientsTable extends Ingredients
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+    'sync_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -462,6 +523,7 @@ class $IngredientsTable extends Ingredients
     conversionFactor,
     isExpiryTracked,
     safetyStockQty,
+    syncId,
     createdAt,
   ];
   @override
@@ -543,6 +605,12 @@ class $IngredientsTable extends Ingredients
         ),
       );
     }
+    if (data.containsKey('sync_id')) {
+      context.handle(
+        _syncIdMeta,
+        syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -590,6 +658,10 @@ class $IngredientsTable extends Ingredients
         DriftSqlType.double,
         data['${effectivePrefix}safety_stock_qty'],
       ),
+      syncId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -612,6 +684,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
   final double conversionFactor;
   final bool isExpiryTracked;
   final double? safetyStockQty;
+  final String? syncId;
   final DateTime createdAt;
   const Ingredient({
     required this.id,
@@ -622,6 +695,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
     required this.conversionFactor,
     required this.isExpiryTracked,
     this.safetyStockQty,
+    this.syncId,
     required this.createdAt,
   });
   @override
@@ -638,6 +712,9 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
     map['is_expiry_tracked'] = Variable<bool>(isExpiryTracked);
     if (!nullToAbsent || safetyStockQty != null) {
       map['safety_stock_qty'] = Variable<double>(safetyStockQty);
+    }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -657,6 +734,9 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
       safetyStockQty: safetyStockQty == null && nullToAbsent
           ? const Value.absent()
           : Value(safetyStockQty),
+      syncId: syncId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncId),
       createdAt: Value(createdAt),
     );
   }
@@ -675,6 +755,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
       conversionFactor: serializer.fromJson<double>(json['conversionFactor']),
       isExpiryTracked: serializer.fromJson<bool>(json['isExpiryTracked']),
       safetyStockQty: serializer.fromJson<double?>(json['safetyStockQty']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -690,6 +771,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
       'conversionFactor': serializer.toJson<double>(conversionFactor),
       'isExpiryTracked': serializer.toJson<bool>(isExpiryTracked),
       'safetyStockQty': serializer.toJson<double?>(safetyStockQty),
+      'syncId': serializer.toJson<String?>(syncId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -703,6 +785,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
     double? conversionFactor,
     bool? isExpiryTracked,
     Value<double?> safetyStockQty = const Value.absent(),
+    Value<String?> syncId = const Value.absent(),
     DateTime? createdAt,
   }) => Ingredient(
     id: id ?? this.id,
@@ -715,6 +798,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
     safetyStockQty: safetyStockQty.present
         ? safetyStockQty.value
         : this.safetyStockQty,
+    syncId: syncId.present ? syncId.value : this.syncId,
     createdAt: createdAt ?? this.createdAt,
   );
   Ingredient copyWithCompanion(IngredientsCompanion data) {
@@ -735,6 +819,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
       safetyStockQty: data.safetyStockQty.present
           ? data.safetyStockQty.value
           : this.safetyStockQty,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -750,6 +835,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
           ..write('conversionFactor: $conversionFactor, ')
           ..write('isExpiryTracked: $isExpiryTracked, ')
           ..write('safetyStockQty: $safetyStockQty, ')
+          ..write('syncId: $syncId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -765,6 +851,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
     conversionFactor,
     isExpiryTracked,
     safetyStockQty,
+    syncId,
     createdAt,
   );
   @override
@@ -779,6 +866,7 @@ class Ingredient extends DataClass implements Insertable<Ingredient> {
           other.conversionFactor == this.conversionFactor &&
           other.isExpiryTracked == this.isExpiryTracked &&
           other.safetyStockQty == this.safetyStockQty &&
+          other.syncId == this.syncId &&
           other.createdAt == this.createdAt);
 }
 
@@ -791,6 +879,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
   final Value<double> conversionFactor;
   final Value<bool> isExpiryTracked;
   final Value<double?> safetyStockQty;
+  final Value<String?> syncId;
   final Value<DateTime> createdAt;
   const IngredientsCompanion({
     this.id = const Value.absent(),
@@ -801,6 +890,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
     this.conversionFactor = const Value.absent(),
     this.isExpiryTracked = const Value.absent(),
     this.safetyStockQty = const Value.absent(),
+    this.syncId = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   IngredientsCompanion.insert({
@@ -812,6 +902,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
     required double conversionFactor,
     required bool isExpiryTracked,
     this.safetyStockQty = const Value.absent(),
+    this.syncId = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : name = Value(name),
        baseUnit = Value(baseUnit),
@@ -827,6 +918,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
     Expression<double>? conversionFactor,
     Expression<bool>? isExpiryTracked,
     Expression<double>? safetyStockQty,
+    Expression<String>? syncId,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -838,6 +930,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
       if (conversionFactor != null) 'conversion_factor': conversionFactor,
       if (isExpiryTracked != null) 'is_expiry_tracked': isExpiryTracked,
       if (safetyStockQty != null) 'safety_stock_qty': safetyStockQty,
+      if (syncId != null) 'sync_id': syncId,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -851,6 +944,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
     Value<double>? conversionFactor,
     Value<bool>? isExpiryTracked,
     Value<double?>? safetyStockQty,
+    Value<String?>? syncId,
     Value<DateTime>? createdAt,
   }) {
     return IngredientsCompanion(
@@ -862,6 +956,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
       conversionFactor: conversionFactor ?? this.conversionFactor,
       isExpiryTracked: isExpiryTracked ?? this.isExpiryTracked,
       safetyStockQty: safetyStockQty ?? this.safetyStockQty,
+      syncId: syncId ?? this.syncId,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -893,6 +988,9 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
     if (safetyStockQty.present) {
       map['safety_stock_qty'] = Variable<double>(safetyStockQty.value);
     }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -910,6 +1008,7 @@ class IngredientsCompanion extends UpdateCompanion<Ingredient> {
           ..write('conversionFactor: $conversionFactor, ')
           ..write('isExpiryTracked: $isExpiryTracked, ')
           ..write('safetyStockQty: $safetyStockQty, ')
+          ..write('syncId: $syncId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1178,6 +1277,15 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
       'REFERENCES stores (id)',
     ),
   );
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+    'sync_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _receivedDateMeta = const VerificationMeta(
     'receivedDate',
   );
@@ -1240,6 +1348,7 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
     ingredientId,
     supplierId,
     storeId,
+    syncId,
     receivedDate,
     expiryDate,
     unitCost,
@@ -1282,6 +1391,12 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
       context.handle(
         _storeIdMeta,
         storeId.isAcceptableOrUnknown(data['store_id']!, _storeIdMeta),
+      );
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(
+        _syncIdMeta,
+        syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta),
       );
     }
     if (data.containsKey('received_date')) {
@@ -1351,6 +1466,10 @@ class $LotsTable extends Lots with TableInfo<$LotsTable, Lot> {
         DriftSqlType.string,
         data['${effectivePrefix}store_id'],
       ),
+      syncId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_id'],
+      ),
       receivedDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}received_date'],
@@ -1385,6 +1504,7 @@ class Lot extends DataClass implements Insertable<Lot> {
   final int ingredientId;
   final int? supplierId;
   final String? storeId;
+  final String? syncId;
   final DateTime receivedDate;
   final DateTime? expiryDate;
   final double unitCost;
@@ -1395,6 +1515,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     required this.ingredientId,
     this.supplierId,
     this.storeId,
+    this.syncId,
     required this.receivedDate,
     this.expiryDate,
     required this.unitCost,
@@ -1411,6 +1532,9 @@ class Lot extends DataClass implements Insertable<Lot> {
     }
     if (!nullToAbsent || storeId != null) {
       map['store_id'] = Variable<String>(storeId);
+    }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
     }
     map['received_date'] = Variable<DateTime>(receivedDate);
     if (!nullToAbsent || expiryDate != null) {
@@ -1432,6 +1556,9 @@ class Lot extends DataClass implements Insertable<Lot> {
       storeId: storeId == null && nullToAbsent
           ? const Value.absent()
           : Value(storeId),
+      syncId: syncId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncId),
       receivedDate: Value(receivedDate),
       expiryDate: expiryDate == null && nullToAbsent
           ? const Value.absent()
@@ -1452,6 +1579,7 @@ class Lot extends DataClass implements Insertable<Lot> {
       ingredientId: serializer.fromJson<int>(json['ingredientId']),
       supplierId: serializer.fromJson<int?>(json['supplierId']),
       storeId: serializer.fromJson<String?>(json['storeId']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
       receivedDate: serializer.fromJson<DateTime>(json['receivedDate']),
       expiryDate: serializer.fromJson<DateTime?>(json['expiryDate']),
       unitCost: serializer.fromJson<double>(json['unitCost']),
@@ -1467,6 +1595,7 @@ class Lot extends DataClass implements Insertable<Lot> {
       'ingredientId': serializer.toJson<int>(ingredientId),
       'supplierId': serializer.toJson<int?>(supplierId),
       'storeId': serializer.toJson<String?>(storeId),
+      'syncId': serializer.toJson<String?>(syncId),
       'receivedDate': serializer.toJson<DateTime>(receivedDate),
       'expiryDate': serializer.toJson<DateTime?>(expiryDate),
       'unitCost': serializer.toJson<double>(unitCost),
@@ -1480,6 +1609,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     int? ingredientId,
     Value<int?> supplierId = const Value.absent(),
     Value<String?> storeId = const Value.absent(),
+    Value<String?> syncId = const Value.absent(),
     DateTime? receivedDate,
     Value<DateTime?> expiryDate = const Value.absent(),
     double? unitCost,
@@ -1490,6 +1620,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     ingredientId: ingredientId ?? this.ingredientId,
     supplierId: supplierId.present ? supplierId.value : this.supplierId,
     storeId: storeId.present ? storeId.value : this.storeId,
+    syncId: syncId.present ? syncId.value : this.syncId,
     receivedDate: receivedDate ?? this.receivedDate,
     expiryDate: expiryDate.present ? expiryDate.value : this.expiryDate,
     unitCost: unitCost ?? this.unitCost,
@@ -1506,6 +1637,7 @@ class Lot extends DataClass implements Insertable<Lot> {
           ? data.supplierId.value
           : this.supplierId,
       storeId: data.storeId.present ? data.storeId.value : this.storeId,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
       receivedDate: data.receivedDate.present
           ? data.receivedDate.value
           : this.receivedDate,
@@ -1527,6 +1659,7 @@ class Lot extends DataClass implements Insertable<Lot> {
           ..write('ingredientId: $ingredientId, ')
           ..write('supplierId: $supplierId, ')
           ..write('storeId: $storeId, ')
+          ..write('syncId: $syncId, ')
           ..write('receivedDate: $receivedDate, ')
           ..write('expiryDate: $expiryDate, ')
           ..write('unitCost: $unitCost, ')
@@ -1542,6 +1675,7 @@ class Lot extends DataClass implements Insertable<Lot> {
     ingredientId,
     supplierId,
     storeId,
+    syncId,
     receivedDate,
     expiryDate,
     unitCost,
@@ -1556,6 +1690,7 @@ class Lot extends DataClass implements Insertable<Lot> {
           other.ingredientId == this.ingredientId &&
           other.supplierId == this.supplierId &&
           other.storeId == this.storeId &&
+          other.syncId == this.syncId &&
           other.receivedDate == this.receivedDate &&
           other.expiryDate == this.expiryDate &&
           other.unitCost == this.unitCost &&
@@ -1568,6 +1703,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
   final Value<int> ingredientId;
   final Value<int?> supplierId;
   final Value<String?> storeId;
+  final Value<String?> syncId;
   final Value<DateTime> receivedDate;
   final Value<DateTime?> expiryDate;
   final Value<double> unitCost;
@@ -1578,6 +1714,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     this.ingredientId = const Value.absent(),
     this.supplierId = const Value.absent(),
     this.storeId = const Value.absent(),
+    this.syncId = const Value.absent(),
     this.receivedDate = const Value.absent(),
     this.expiryDate = const Value.absent(),
     this.unitCost = const Value.absent(),
@@ -1589,6 +1726,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     required int ingredientId,
     this.supplierId = const Value.absent(),
     this.storeId = const Value.absent(),
+    this.syncId = const Value.absent(),
     required DateTime receivedDate,
     this.expiryDate = const Value.absent(),
     required double unitCost,
@@ -1603,6 +1741,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     Expression<int>? ingredientId,
     Expression<int>? supplierId,
     Expression<String>? storeId,
+    Expression<String>? syncId,
     Expression<DateTime>? receivedDate,
     Expression<DateTime>? expiryDate,
     Expression<double>? unitCost,
@@ -1614,6 +1753,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
       if (ingredientId != null) 'ingredient_id': ingredientId,
       if (supplierId != null) 'supplier_id': supplierId,
       if (storeId != null) 'store_id': storeId,
+      if (syncId != null) 'sync_id': syncId,
       if (receivedDate != null) 'received_date': receivedDate,
       if (expiryDate != null) 'expiry_date': expiryDate,
       if (unitCost != null) 'unit_cost': unitCost,
@@ -1627,6 +1767,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     Value<int>? ingredientId,
     Value<int?>? supplierId,
     Value<String?>? storeId,
+    Value<String?>? syncId,
     Value<DateTime>? receivedDate,
     Value<DateTime?>? expiryDate,
     Value<double>? unitCost,
@@ -1638,6 +1779,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
       ingredientId: ingredientId ?? this.ingredientId,
       supplierId: supplierId ?? this.supplierId,
       storeId: storeId ?? this.storeId,
+      syncId: syncId ?? this.syncId,
       receivedDate: receivedDate ?? this.receivedDate,
       expiryDate: expiryDate ?? this.expiryDate,
       unitCost: unitCost ?? this.unitCost,
@@ -1660,6 +1802,9 @@ class LotsCompanion extends UpdateCompanion<Lot> {
     }
     if (storeId.present) {
       map['store_id'] = Variable<String>(storeId.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
     }
     if (receivedDate.present) {
       map['received_date'] = Variable<DateTime>(receivedDate.value);
@@ -1686,6 +1831,7 @@ class LotsCompanion extends UpdateCompanion<Lot> {
           ..write('ingredientId: $ingredientId, ')
           ..write('supplierId: $supplierId, ')
           ..write('storeId: $storeId, ')
+          ..write('syncId: $syncId, ')
           ..write('receivedDate: $receivedDate, ')
           ..write('expiryDate: $expiryDate, ')
           ..write('unitCost: $unitCost, ')
@@ -1726,6 +1872,15 @@ class $StockMovementsTable extends StockMovements
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES lots (id)',
     ),
+  );
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+    'sync_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
@@ -1783,6 +1938,7 @@ class $StockMovementsTable extends StockMovements
   List<GeneratedColumn> get $columns => [
     id,
     lotId,
+    syncId,
     type,
     quantity,
     occurredAt,
@@ -1811,6 +1967,12 @@ class $StockMovementsTable extends StockMovements
       );
     } else if (isInserting) {
       context.missing(_lotIdMeta);
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(
+        _syncIdMeta,
+        syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta),
+      );
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -1865,6 +2027,10 @@ class $StockMovementsTable extends StockMovements
         DriftSqlType.int,
         data['${effectivePrefix}lot_id'],
       )!,
+      syncId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_id'],
+      ),
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
@@ -1897,6 +2063,7 @@ class $StockMovementsTable extends StockMovements
 class StockMovement extends DataClass implements Insertable<StockMovement> {
   final int id;
   final int lotId;
+  final String? syncId;
   final String type;
   final double quantity;
   final DateTime occurredAt;
@@ -1905,6 +2072,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   const StockMovement({
     required this.id,
     required this.lotId,
+    this.syncId,
     required this.type,
     required this.quantity,
     required this.occurredAt,
@@ -1916,6 +2084,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['lot_id'] = Variable<int>(lotId);
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
     map['type'] = Variable<String>(type);
     map['quantity'] = Variable<double>(quantity);
     map['occurred_at'] = Variable<DateTime>(occurredAt);
@@ -1930,6 +2101,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     return StockMovementsCompanion(
       id: Value(id),
       lotId: Value(lotId),
+      syncId: syncId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syncId),
       type: Value(type),
       quantity: Value(quantity),
       occurredAt: Value(occurredAt),
@@ -1946,6 +2120,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     return StockMovement(
       id: serializer.fromJson<int>(json['id']),
       lotId: serializer.fromJson<int>(json['lotId']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
       type: serializer.fromJson<String>(json['type']),
       quantity: serializer.fromJson<double>(json['quantity']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
@@ -1959,6 +2134,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'lotId': serializer.toJson<int>(lotId),
+      'syncId': serializer.toJson<String?>(syncId),
       'type': serializer.toJson<String>(type),
       'quantity': serializer.toJson<double>(quantity),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
@@ -1970,6 +2146,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   StockMovement copyWith({
     int? id,
     int? lotId,
+    Value<String?> syncId = const Value.absent(),
     String? type,
     double? quantity,
     DateTime? occurredAt,
@@ -1978,6 +2155,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   }) => StockMovement(
     id: id ?? this.id,
     lotId: lotId ?? this.lotId,
+    syncId: syncId.present ? syncId.value : this.syncId,
     type: type ?? this.type,
     quantity: quantity ?? this.quantity,
     occurredAt: occurredAt ?? this.occurredAt,
@@ -1988,6 +2166,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     return StockMovement(
       id: data.id.present ? data.id.value : this.id,
       lotId: data.lotId.present ? data.lotId.value : this.lotId,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
       type: data.type.present ? data.type.value : this.type,
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
       occurredAt: data.occurredAt.present
@@ -2003,6 +2182,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     return (StringBuffer('StockMovement(')
           ..write('id: $id, ')
           ..write('lotId: $lotId, ')
+          ..write('syncId: $syncId, ')
           ..write('type: $type, ')
           ..write('quantity: $quantity, ')
           ..write('occurredAt: $occurredAt, ')
@@ -2013,14 +2193,23 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, lotId, type, quantity, occurredAt, memo, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    lotId,
+    syncId,
+    type,
+    quantity,
+    occurredAt,
+    memo,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is StockMovement &&
           other.id == this.id &&
           other.lotId == this.lotId &&
+          other.syncId == this.syncId &&
           other.type == this.type &&
           other.quantity == this.quantity &&
           other.occurredAt == this.occurredAt &&
@@ -2031,6 +2220,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
 class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   final Value<int> id;
   final Value<int> lotId;
+  final Value<String?> syncId;
   final Value<String> type;
   final Value<double> quantity;
   final Value<DateTime> occurredAt;
@@ -2039,6 +2229,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   const StockMovementsCompanion({
     this.id = const Value.absent(),
     this.lotId = const Value.absent(),
+    this.syncId = const Value.absent(),
     this.type = const Value.absent(),
     this.quantity = const Value.absent(),
     this.occurredAt = const Value.absent(),
@@ -2048,6 +2239,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   StockMovementsCompanion.insert({
     this.id = const Value.absent(),
     required int lotId,
+    this.syncId = const Value.absent(),
     required String type,
     required double quantity,
     required DateTime occurredAt,
@@ -2060,6 +2252,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   static Insertable<StockMovement> custom({
     Expression<int>? id,
     Expression<int>? lotId,
+    Expression<String>? syncId,
     Expression<String>? type,
     Expression<double>? quantity,
     Expression<DateTime>? occurredAt,
@@ -2069,6 +2262,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (lotId != null) 'lot_id': lotId,
+      if (syncId != null) 'sync_id': syncId,
       if (type != null) 'type': type,
       if (quantity != null) 'quantity': quantity,
       if (occurredAt != null) 'occurred_at': occurredAt,
@@ -2080,6 +2274,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   StockMovementsCompanion copyWith({
     Value<int>? id,
     Value<int>? lotId,
+    Value<String?>? syncId,
     Value<String>? type,
     Value<double>? quantity,
     Value<DateTime>? occurredAt,
@@ -2089,6 +2284,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     return StockMovementsCompanion(
       id: id ?? this.id,
       lotId: lotId ?? this.lotId,
+      syncId: syncId ?? this.syncId,
       type: type ?? this.type,
       quantity: quantity ?? this.quantity,
       occurredAt: occurredAt ?? this.occurredAt,
@@ -2105,6 +2301,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     }
     if (lotId.present) {
       map['lot_id'] = Variable<int>(lotId.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -2129,6 +2328,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     return (StringBuffer('StockMovementsCompanion(')
           ..write('id: $id, ')
           ..write('lotId: $lotId, ')
+          ..write('syncId: $syncId, ')
           ..write('type: $type, ')
           ..write('quantity: $quantity, ')
           ..write('occurredAt: $occurredAt, ')
@@ -2693,6 +2893,7 @@ typedef $$SuppliersTableCreateCompanionBuilder =
       required String name,
       Value<String?> contact,
       Value<String?> memo,
+      Value<String?> syncId,
       Value<DateTime> createdAt,
     });
 typedef $$SuppliersTableUpdateCompanionBuilder =
@@ -2701,6 +2902,7 @@ typedef $$SuppliersTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String?> contact,
       Value<String?> memo,
+      Value<String?> syncId,
       Value<DateTime> createdAt,
     });
 
@@ -2754,6 +2956,11 @@ class $$SuppliersTableFilterComposer
 
   ColumnFilters<String> get memo => $composableBuilder(
     column: $table.memo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+    column: $table.syncId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2817,6 +3024,11 @@ class $$SuppliersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncId => $composableBuilder(
+    column: $table.syncId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2843,6 +3055,9 @@ class $$SuppliersTableAnnotationComposer
 
   GeneratedColumn<String> get memo =>
       $composableBuilder(column: $table.memo, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2905,12 +3120,14 @@ class $$SuppliersTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> contact = const Value.absent(),
                 Value<String?> memo = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => SuppliersCompanion(
                 id: id,
                 name: name,
                 contact: contact,
                 memo: memo,
+                syncId: syncId,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -2919,12 +3136,14 @@ class $$SuppliersTableTableManager
                 required String name,
                 Value<String?> contact = const Value.absent(),
                 Value<String?> memo = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => SuppliersCompanion.insert(
                 id: id,
                 name: name,
                 contact: contact,
                 memo: memo,
+                syncId: syncId,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -2985,6 +3204,7 @@ typedef $$IngredientsTableCreateCompanionBuilder =
       required double conversionFactor,
       required bool isExpiryTracked,
       Value<double?> safetyStockQty,
+      Value<String?> syncId,
       Value<DateTime> createdAt,
     });
 typedef $$IngredientsTableUpdateCompanionBuilder =
@@ -2997,6 +3217,7 @@ typedef $$IngredientsTableUpdateCompanionBuilder =
       Value<double> conversionFactor,
       Value<bool> isExpiryTracked,
       Value<double?> safetyStockQty,
+      Value<String?> syncId,
       Value<DateTime> createdAt,
     });
 
@@ -3070,6 +3291,11 @@ class $$IngredientsTableFilterComposer
 
   ColumnFilters<double> get safetyStockQty => $composableBuilder(
     column: $table.safetyStockQty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+    column: $table.syncId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3153,6 +3379,11 @@ class $$IngredientsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncId => $composableBuilder(
+    column: $table.syncId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3199,6 +3430,9 @@ class $$IngredientsTableAnnotationComposer
     column: $table.safetyStockQty,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -3265,6 +3499,7 @@ class $$IngredientsTableTableManager
                 Value<double> conversionFactor = const Value.absent(),
                 Value<bool> isExpiryTracked = const Value.absent(),
                 Value<double?> safetyStockQty = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => IngredientsCompanion(
                 id: id,
@@ -3275,6 +3510,7 @@ class $$IngredientsTableTableManager
                 conversionFactor: conversionFactor,
                 isExpiryTracked: isExpiryTracked,
                 safetyStockQty: safetyStockQty,
+                syncId: syncId,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -3287,6 +3523,7 @@ class $$IngredientsTableTableManager
                 required double conversionFactor,
                 required bool isExpiryTracked,
                 Value<double?> safetyStockQty = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => IngredientsCompanion.insert(
                 id: id,
@@ -3297,6 +3534,7 @@ class $$IngredientsTableTableManager
                 conversionFactor: conversionFactor,
                 isExpiryTracked: isExpiryTracked,
                 safetyStockQty: safetyStockQty,
+                syncId: syncId,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -3587,6 +3825,7 @@ typedef $$LotsTableCreateCompanionBuilder =
       required int ingredientId,
       Value<int?> supplierId,
       Value<String?> storeId,
+      Value<String?> syncId,
       required DateTime receivedDate,
       Value<DateTime?> expiryDate,
       required double unitCost,
@@ -3599,6 +3838,7 @@ typedef $$LotsTableUpdateCompanionBuilder =
       Value<int> ingredientId,
       Value<int?> supplierId,
       Value<String?> storeId,
+      Value<String?> syncId,
       Value<DateTime> receivedDate,
       Value<DateTime?> expiryDate,
       Value<double> unitCost,
@@ -3690,6 +3930,11 @@ class $$LotsTableFilterComposer extends Composer<_$AppDatabase, $LotsTable> {
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+    column: $table.syncId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3826,6 +4071,11 @@ class $$LotsTableOrderingComposer extends Composer<_$AppDatabase, $LotsTable> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncId => $composableBuilder(
+    column: $table.syncId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get receivedDate => $composableBuilder(
     column: $table.receivedDate,
     builder: (column) => ColumnOrderings(column),
@@ -3932,6 +4182,9 @@ class $$LotsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get receivedDate => $composableBuilder(
     column: $table.receivedDate,
@@ -4086,6 +4339,7 @@ class $$LotsTableTableManager
                 Value<int> ingredientId = const Value.absent(),
                 Value<int?> supplierId = const Value.absent(),
                 Value<String?> storeId = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 Value<DateTime> receivedDate = const Value.absent(),
                 Value<DateTime?> expiryDate = const Value.absent(),
                 Value<double> unitCost = const Value.absent(),
@@ -4096,6 +4350,7 @@ class $$LotsTableTableManager
                 ingredientId: ingredientId,
                 supplierId: supplierId,
                 storeId: storeId,
+                syncId: syncId,
                 receivedDate: receivedDate,
                 expiryDate: expiryDate,
                 unitCost: unitCost,
@@ -4108,6 +4363,7 @@ class $$LotsTableTableManager
                 required int ingredientId,
                 Value<int?> supplierId = const Value.absent(),
                 Value<String?> storeId = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 required DateTime receivedDate,
                 Value<DateTime?> expiryDate = const Value.absent(),
                 required double unitCost,
@@ -4118,6 +4374,7 @@ class $$LotsTableTableManager
                 ingredientId: ingredientId,
                 supplierId: supplierId,
                 storeId: storeId,
+                syncId: syncId,
                 receivedDate: receivedDate,
                 expiryDate: expiryDate,
                 unitCost: unitCost,
@@ -4253,6 +4510,7 @@ typedef $$StockMovementsTableCreateCompanionBuilder =
     StockMovementsCompanion Function({
       Value<int> id,
       required int lotId,
+      Value<String?> syncId,
       required String type,
       required double quantity,
       required DateTime occurredAt,
@@ -4263,6 +4521,7 @@ typedef $$StockMovementsTableUpdateCompanionBuilder =
     StockMovementsCompanion Function({
       Value<int> id,
       Value<int> lotId,
+      Value<String?> syncId,
       Value<String> type,
       Value<double> quantity,
       Value<DateTime> occurredAt,
@@ -4307,6 +4566,11 @@ class $$StockMovementsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+    column: $table.syncId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4373,6 +4637,11 @@ class $$StockMovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get syncId => $composableBuilder(
+    column: $table.syncId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
     builder: (column) => ColumnOrderings(column),
@@ -4433,6 +4702,9 @@ class $$StockMovementsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -4507,6 +4779,7 @@ class $$StockMovementsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int> lotId = const Value.absent(),
+                Value<String?> syncId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<double> quantity = const Value.absent(),
                 Value<DateTime> occurredAt = const Value.absent(),
@@ -4515,6 +4788,7 @@ class $$StockMovementsTableTableManager
               }) => StockMovementsCompanion(
                 id: id,
                 lotId: lotId,
+                syncId: syncId,
                 type: type,
                 quantity: quantity,
                 occurredAt: occurredAt,
@@ -4525,6 +4799,7 @@ class $$StockMovementsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required int lotId,
+                Value<String?> syncId = const Value.absent(),
                 required String type,
                 required double quantity,
                 required DateTime occurredAt,
@@ -4533,6 +4808,7 @@ class $$StockMovementsTableTableManager
               }) => StockMovementsCompanion.insert(
                 id: id,
                 lotId: lotId,
+                syncId: syncId,
                 type: type,
                 quantity: quantity,
                 occurredAt: occurredAt,

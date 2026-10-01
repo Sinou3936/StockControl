@@ -10,6 +10,7 @@ class Lots extends Table {
   IntColumn get supplierId =>
       integer().nullable().references(Suppliers, #id)();
   TextColumn get storeId => text().nullable().references(Stores, #id)();
+  TextColumn get syncId => text().nullable()();
   DateTimeColumn get receivedDate => dateTime()();
   DateTimeColumn get expiryDate => dateTime().nullable()();
   RealColumn get unitCost => real()();
