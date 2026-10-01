@@ -89,7 +89,29 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(wrap());
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'staff1@internal.local',
+            pin: '111111',
+            displayName: '직원1',
+            role: 'staff',
+            storeId: 'store-1',
+            storeName: '울산점',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AppShell()),
+      ),
+    );
     await tester.pump();
 
     await tester.tap(find.text('입고 등록'));

@@ -696,11 +696,13 @@ git commit -m "feat: filter stock overview by store and show store names"
 **Files:**
 - Modify: `lib/features/inbound/inbound_form_screen.dart`
 - Modify: `test/features/inbound/inbound_form_screen_test.dart`
+- Modify: `test/core/shell/app_shell_test.dart`
 
 - [ ] **Step 1: 기존 테스트에 세션 추가 + 신규 테스트 추가**
 
 `test/features/inbound/inbound_form_screen_test.dart` 전체를 아래 내용으로 교체:
 ```dart
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1003,15 +1005,76 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
 Run: `flutter test test/features/inbound/inbound_form_screen_test.dart`
 Expected: PASS (2 tests passed)
 
-- [ ] **Step 5: 정적 분석 확인**
+- [ ] **Step 5: 전체 테스트 실행하여 회귀 확인**
+
+Run: `flutter test`
+Expected: `test/core/shell/app_shell_test.dart`의 `keeps entered form values when switching tabs (IndexedStack)`가 깨진다 — 이 테스트는 세션 없이 `AppShell` 안의 `InboundFormScreen`에 바로 텍스트를 입력하는데, 이제 세션이 없으면 폼 대신 "매장을 선택해주세요"가 뜨어서 `purchaseQtyField`를 찾지 못한다.
+
+`test/core/shell/app_shell_test.dart`에서 해당 테스트를 아래로 교체(세션 추가):
+```dart
+  testWidgets('keeps entered form values when switching tabs (IndexedStack)',
+      (tester) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'staff1@internal.local',
+            pin: '111111',
+            displayName: '직원1',
+            role: 'staff',
+            storeId: 'store-1',
+            storeName: '울산점',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AppShell()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('입고 등록'));
+    await tester.pump();
+
+    await tester.enterText(find.byKey(const Key('purchaseQtyField')), '3');
+
+    await tester.tap(find.text('재고 조회'));
+    await tester.pump();
+    await tester.tap(find.text('입고 등록'));
+    await tester.pump();
+
+    expect(find.text('3'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+```
+
+이 테스트는 이미 `ProviderScope`를 쓰는 `wrap()` 헬퍼 대신 `UncontrolledProviderScope`+`ProviderContainer`로 바꿔서 세션을 주입한다 — 같은 파일의 "desktop sidebar logout button" 테스트와 동일한 패턴이다.
+
+Run: `flutter test`
+Expected: PASS 전부
+
+- [ ] **Step 6: 정적 분석 확인**
 
 Run: `flutter analyze lib`
 Expected: `No issues found!`
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add lib/features/inbound/inbound_form_screen.dart test/features/inbound/inbound_form_screen_test.dart
+git add lib/features/inbound/inbound_form_screen.dart test/features/inbound/inbound_form_screen_test.dart test/core/shell/app_shell_test.dart
 git commit -m "feat: require a store before registering inbound stock"
 ```
 
@@ -1388,6 +1451,6 @@ git commit -m "feat: require a store before taking a closing count"
 
 **타입 일관성 확인**: `activeStoreIdProvider`(Task 1)가 Task 5·6·7 세 화면에서 전부 동일한 이름으로 쓰임. `LotDao.watchAvailableLotsWithIngredient({String? storeId})`(Task 3)가 Task 5·7의 호출부와 일치. `LotRepository.receiveLot(..., String? storeId, ...)`(Task 4)가 Task 6의 호출부와 일치. `StoreSwitcher`(Task 2)가 Task 5·6·7의 `AppBar(actions: [...])`에서 동일하게 쓰임.
 
-**기존 테스트와의 호환성 확인**: `LotDao`/`LotRepository`의 `storeId`를 전부 선택값(옵션)으로 둬서, 3~6단계에서 만든 기존 call site(= `LotsCompanion.insert`를 storeId 없이 호출하는 곳들)가 깨지지 않는다. `StockOverviewScreen`의 기존 테스트는 세션이 없어 `activeStoreIdProvider`가 `null`(필터 없음)이 되므로 수정 없이 통과한다. `InboundFormScreen`/`CountScreen`은 "매장 미선택 시 막기"가 생겨서 기존 테스트에 세션(또는 매장 일치하는 로트)을 추가해야 했다 — Task 6·7에서 테스트 파일을 교체하며 반영했다.
+**기존 테스트와의 호환성 확인**: `LotDao`/`LotRepository`의 `storeId`를 전부 선택값(옵션)으로 둬서, 3~6단계에서 만든 기존 call site(= `LotsCompanion.insert`를 storeId 없이 호출하는 곳들)가 깨지지 않는다. `StockOverviewScreen`의 기존 테스트는 세션이 없어 `activeStoreIdProvider`가 `null`(필터 없음)이 되므로 수정 없이 통과한다. `InboundFormScreen`/`CountScreen`은 "매장 미선택 시 막기"가 생겨서 기존 테스트에 세션(또는 매장 일치하는 로트)을 추가해야 했다 — Task 6·7에서 테스트 파일을 교체하며 반영했다. **실행 중 추가로 발견**: `test/core/shell/app_shell_test.dart`의 "keeps entered form values..." 테스트도 `AppShell` 내부의 `InboundFormScreen`에 세션 없이 바로 텍스트를 입력하고 있어서 같은 이유로 깨졌다 — Task 6에 해당 테스트 수정을 추가로 반영했다(7단계 전체 스위트 실행에서 발견됨, 자가 검토 당시엔 `app_shell_test.dart`가 `InboundFormScreen`을 간접적으로 쓴다는 걸 놓쳤다).
 
 **태스크 순서 확인**: Task 6(입고 등록)은 Task 4(`receiveLot`의 storeId)와 Task 1·2(provider·위젯)에 의존하고, Task 7(마감 실사)은 Task 3(`LotDao` 필터)과 Task 1·2에 의존한다 — 전부 더 앞선 태스크 번호라 실행 순서상 문제없다. 매 태스크가 "화면 수정 + 그 화면의 테스트 수정"을 한 태스크 안에서 같이 끝내므로, 8-1/1차에서 자가 검토로 발견했던 "시그니처 변경과 호출부 수정 사이에 빌드가 깨지는 커밋" 문제가 재발하지 않는다.
