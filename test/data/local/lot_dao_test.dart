@@ -75,4 +75,33 @@ void main() {
     expect(rows[1].lot.id, laterLotId);
     expect(rows[0].ingredient.name, '양파');
   });
+
+  test('watchAvailableLotsWithIngredient filters by storeId when given',
+      () async {
+    final storeOneLotId = await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        storeId: const Value('store-1'),
+        receivedDate: DateTime(2026, 9, 1),
+        unitCost: 15.0,
+        remainingQty: 1000,
+      ),
+    );
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        storeId: const Value('store-2'),
+        receivedDate: DateTime(2026, 9, 1),
+        unitCost: 15.0,
+        remainingQty: 2000,
+      ),
+    );
+
+    final rows = await db.lotDao
+        .watchAvailableLotsWithIngredient(storeId: 'store-1')
+        .first;
+
+    expect(rows, hasLength(1));
+    expect(rows.first.lot.id, storeOneLotId);
+  });
 }

@@ -24,12 +24,19 @@ class LotDao extends DatabaseAccessor<AppDatabase> with _$LotDaoMixin {
       (select(lots)..where((l) => l.ingredientId.equals(ingredientId)))
           .watch();
 
-  Stream<List<LotWithIngredient>> watchAvailableLotsWithIngredient() {
+  Stream<List<LotWithIngredient>> watchAvailableLotsWithIngredient({
+    String? storeId,
+  }) {
     final query = select(lots).join([
       innerJoin(ingredients, ingredients.id.equalsExp(lots.ingredientId)),
     ])
-      ..where(lots.remainingQty.isBiggerThanValue(0))
-      ..orderBy([OrderingTerm.asc(lots.expiryDate)]);
+      ..where(lots.remainingQty.isBiggerThanValue(0));
+
+    if (storeId != null) {
+      query.where(lots.storeId.equals(storeId));
+    }
+
+    query.orderBy([OrderingTerm.asc(lots.expiryDate)]);
 
     return query.watch().map(
           (rows) => rows
