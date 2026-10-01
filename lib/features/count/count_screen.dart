@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/dao_providers.dart';
 import '../../core/providers/repository_providers.dart';
+import '../../core/providers/store_providers.dart';
 import '../../domain/stock_count.dart';
 import '../../domain/stock_overview.dart';
+import '../stock/store_switcher.dart';
 
 class CountScreen extends ConsumerStatefulWidget {
   const CountScreen({super.key});
@@ -18,63 +20,74 @@ class _CountScreenState extends ConsumerState<CountScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dao = ref.watch(lotDaoProvider);
+    final storeId = ref.watch(activeStoreIdProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('마감 실사')),
-      body: StreamBuilder<List<LotWithIngredient>>(
-        stream: dao.watchAvailableLotsWithIngredient(),
-        builder: (context, snapshot) {
-          final groups = groupLotsByIngredient(
-            snapshot.data ?? [],
-            now: DateTime.now(),
-          );
-
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: groups.length,
-                  itemBuilder: (context, index) {
-                    final group = groups[index];
-                    return ListTile(
-                      title: Text(group.ingredient.name),
-                      subtitle: Text(
-                        '이론재고 ${group.totalRemainingQty}'
-                        '${group.ingredient.baseUnit}',
-                      ),
-                      trailing: SizedBox(
-                        width: 100,
-                        child: TextFormField(
-                          key: Key('countField_${group.ingredient.id}'),
-                          decoration:
-                              const InputDecoration(labelText: '실사 수량'),
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) {
-                            final parsed = double.tryParse(value);
-                            if (parsed == null) {
-                              _enteredCounts.remove(group.ingredient.id);
-                            } else {
-                              _enteredCounts[group.ingredient.id] = parsed;
-                            }
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: ElevatedButton(
-                  onPressed: () => _submit(groups),
-                  child: const Text('실사 제출'),
-                ),
-              ),
-            ],
-          );
-        },
+      appBar: AppBar(
+        title: const Text('마감 실사'),
+        actions: const [StoreSwitcher()],
       ),
+      body: storeId == null
+          ? const Center(child: Text('매장을 선택해주세요'))
+          : _buildCountList(storeId),
+    );
+  }
+
+  Widget _buildCountList(String storeId) {
+    final dao = ref.watch(lotDaoProvider);
+
+    return StreamBuilder<List<LotWithIngredient>>(
+      stream: dao.watchAvailableLotsWithIngredient(storeId: storeId),
+      builder: (context, snapshot) {
+        final groups = groupLotsByIngredient(
+          snapshot.data ?? [],
+          now: DateTime.now(),
+        );
+
+        return Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                itemCount: groups.length,
+                itemBuilder: (context, index) {
+                  final group = groups[index];
+                  return ListTile(
+                    title: Text(group.ingredient.name),
+                    subtitle: Text(
+                      '이론재고 ${group.totalRemainingQty}'
+                      '${group.ingredient.baseUnit}',
+                    ),
+                    trailing: SizedBox(
+                      width: 100,
+                      child: TextFormField(
+                        key: Key('countField_${group.ingredient.id}'),
+                        decoration:
+                            const InputDecoration(labelText: '실사 수량'),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          final parsed = double.tryParse(value);
+                          if (parsed == null) {
+                            _enteredCounts.remove(group.ingredient.id);
+                          } else {
+                            _enteredCounts[group.ingredient.id] = parsed;
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: ElevatedButton(
+                onPressed: () => _submit(groups),
+                child: const Text('실사 제출'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
