@@ -245,7 +245,7 @@ void main() {
     expect(dropdown.items, hasLength(2));
     expect(dropdown.value, isNull);
 
-    final store = (await db.storeDao.watchAll().first).first;
+    const store = Store(id: 'store-1', name: '울산점');
     container.read(selectedStoreProvider.notifier).state = store;
     await tester.pump();
 
@@ -318,6 +318,8 @@ class StoreSwitcher extends ConsumerWidget {
 
 Run: `flutter test test/features/stock/store_switcher_test.dart`
 Expected: PASS (2 tests passed)
+
+**실행 중 발견한 문제**: 두 번째 테스트에서 매장을 직접 DB에서 다시 읽어오려고 `await db.storeDao.watchAll().first`를 썼더니 `testWidgets` 안에서 영원히 멈췄다. `testWidgets`는 가짜 비동기(zone) 환경이라 `tester.pump()`로 넘기지 않는 real Timer/Stream 알림이 멀쩡히 끝나지 않는다(Drift `.watch()`의 알림 메커니즘이 여기 해당) — `tester.runAsync()`로 감싸거나, 아예 DB를 다시 거치지 않고 `const Store(id: 'store-1', name: '울산점')`처럼 값을 직접 만들어 쓰면 된다. 같은 패턴이 Task 1의 `test()`(플레인 Dart 테스트, `testWidgets` 아님)에서는 멀쩡히 동작했다 — 문제는 `testWidgets` 환경 안에서 real stream을 직접 await할 때만 생긴다. 위 코드에 이미 반영.
 
 - [ ] **Step 5: Commit**
 
