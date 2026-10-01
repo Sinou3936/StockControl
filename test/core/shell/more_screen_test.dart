@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
+import 'package:stockcontrol/core/providers/store_providers.dart';
 import 'package:stockcontrol/core/shell/more_screen.dart';
 import 'package:stockcontrol/data/local/database.dart';
+import 'package:stockcontrol/data/repositories/store_repository.dart';
 import 'package:stockcontrol/features/ingredient_management/ingredient_list_screen.dart';
+import 'package:stockcontrol/features/store_management/store_management_screen.dart';
 import 'package:stockcontrol/features/supplier_management/supplier_list_screen.dart';
+
+import '../../support/fake_store_gateway.dart';
 
 void main() {
   late AppDatabase db;
@@ -76,6 +81,45 @@ void main() {
     await tester.pump();
 
     expect(container.read(authSessionProvider), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('shows store management for an owner and navigates to it',
+      (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        storeRepositoryProvider.overrideWithValue(
+          StoreRepository(FakeStoreGateway(), db.storeDao),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'owner@internal.local',
+            pin: '123456',
+            displayName: '사장님',
+            role: 'owner',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MoreScreen()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('매장 관리'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StoreManagementScreen), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

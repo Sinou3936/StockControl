@@ -1351,7 +1351,11 @@ git commit -m "feat: carry store info into AuthSession"
 `test/core/shell/more_screen_test.dart`의 `import` 목록에 아래를 추가:
 
 ```dart
+import 'package:stockcontrol/core/providers/store_providers.dart';
+import 'package:stockcontrol/data/repositories/store_repository.dart';
 import 'package:stockcontrol/features/store_management/store_management_screen.dart';
+
+import '../../support/fake_store_gateway.dart';
 ```
 
 그리고 `logging out clears the auth session` 테스트 다음(파일 맨 끝 `}` 앞)에 아래 테스트를 추가:
@@ -1361,7 +1365,12 @@ import 'package:stockcontrol/features/store_management/store_management_screen.d
   testWidgets('shows store management for an owner and navigates to it',
       (tester) async {
     final container = ProviderContainer(
-      overrides: [appDatabaseProvider.overrideWithValue(db)],
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        storeRepositoryProvider.overrideWithValue(
+          StoreRepository(FakeStoreGateway(), db.storeDao),
+        ),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -1397,6 +1406,8 @@ import 'package:stockcontrol/features/store_management/store_management_screen.d
 
 Run: `flutter test test/core/shell/more_screen_test.dart`
 Expected: FAIL — "매장 관리" 항목이 없어서 `find.text('매장 관리')`가 아무것도 못 찾음
+
+**실행 중 발견한 문제**: `storeRepositoryProvider`를 오버라이드하지 않으면 `StoreManagementScreen`으로 이동하는 순간 실제 `Supabase.instance.client`를 참조하다가 "`Supabase.initialize()`를 먼저 호출해야 한다"는 어서션 에러가 난다(테스트 환경에선 `Supabase.initialize()`를 호출하지 않으므로). `authRepositoryProvider`를 오버라이드해온 기존 패턴과 동일하게, `storeRepositoryProvider`도 `FakeStoreGateway` 기반으로 오버라이드해야 한다(위 코드에 이미 반영).
 
 - [ ] **Step 3: MoreScreen 수정**
 

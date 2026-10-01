@@ -9,6 +9,7 @@ import '../../features/supplier_management/supplier_list_screen.dart';
 import '../providers/auth_providers.dart';
 import 'auth_add_staff_route.dart';
 import 'more_screen.dart';
+import 'store_management_route.dart';
 
 const _kDesktopBreakpoint = 600.0;
 
@@ -52,6 +53,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                 pushAddStaffScreen(context);
                 return;
               }
+              if (isOwner && index == 6) {
+                pushStoreManagementScreen(context);
+                return;
+              }
               setState(() => _selectedIndex = index);
             },
             labelType: NavigationRailLabelType.all,
@@ -85,6 +90,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 const NavigationRailDestination(
                   icon: Icon(Icons.person_add_outlined),
                   label: Text('직원 추가'),
+                ),
+              if (isOwner)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.store_mall_directory_outlined),
+                  label: Text('매장 관리'),
                 ),
             ],
             trailing: Expanded(

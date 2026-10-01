@@ -5,6 +5,7 @@ import '../../features/ingredient_management/ingredient_list_screen.dart';
 import '../../features/supplier_management/supplier_list_screen.dart';
 import '../providers/auth_providers.dart';
 import 'auth_add_staff_route.dart';
+import 'store_management_route.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -31,6 +32,11 @@ class MoreScreen extends ConsumerWidget {
               ),
             ),
           ),
+          if (session?.isOwner ?? false)
+            ListTile(
+              title: const Text('매장 관리'),
+              onTap: () => pushStoreManagementScreen(context),
+            ),
           if (session?.isOwner ?? false)
             ListTile(
               title: const Text('직원 추가'),
