@@ -13,6 +13,7 @@ class LotRepository {
   Future<int> receiveLot({
     required int ingredientId,
     int? supplierId,
+    String? storeId,
     required DateTime receivedDate,
     DateTime? expiryDate,
     required double unitCost,
@@ -25,6 +26,7 @@ class LotRepository {
         LotsCompanion.insert(
           ingredientId: ingredientId,
           supplierId: Value(supplierId),
+          storeId: Value(storeId),
           receivedDate: receivedDate,
           expiryDate: Value(expiryDate),
           unitCost: unitCost,

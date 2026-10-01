@@ -174,4 +174,17 @@ void main() {
     expect(oldMovements.first.type, 'countCorrection');
     expect(newMovements.first.type, 'countCorrection');
   });
+
+  test('receiveLot records the given storeId on the new lot', () async {
+    final lotId = await repository.receiveLot(
+      ingredientId: ingredientId,
+      storeId: 'store-1',
+      receivedDate: DateTime(2026, 9, 3),
+      unitCost: 15.0,
+      baseQty: 1000,
+    );
+
+    final lot = await db.lotDao.getById(lotId);
+    expect(lot.storeId, 'store-1');
+  });
 }
