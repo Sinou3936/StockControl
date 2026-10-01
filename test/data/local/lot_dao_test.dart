@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/data/local/database.dart';
@@ -103,5 +103,19 @@ void main() {
 
     expect(rows, hasLength(1));
     expect(rows.first.lot.id, storeOneLotId);
+  });
+
+  test('insertLot always generates a syncId', () async {
+    final lotId = await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        receivedDate: DateTime(2026, 9, 3),
+        unitCost: 15.0,
+        remainingQty: 20000,
+      ),
+    );
+
+    final lot = await db.lotDao.getById(lotId);
+    expect(lot.syncId, isNotNull);
   });
 }

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../domain/stock_overview.dart';
+import '../../../domain/sync_id.dart';
 import '../database.dart';
 import '../tables/lots_table.dart';
 
@@ -10,7 +11,8 @@ part 'lot_dao.g.dart';
 class LotDao extends DatabaseAccessor<AppDatabase> with _$LotDaoMixin {
   LotDao(super.db);
 
-  Future<int> insertLot(LotsCompanion entry) => into(lots).insert(entry);
+  Future<int> insertLot(LotsCompanion entry) =>
+      into(lots).insert(entry.copyWith(syncId: Value(generateSyncId())));
 
   Future<Lot> getById(int id) =>
       (select(lots)..where((l) => l.id.equals(id))).getSingle();

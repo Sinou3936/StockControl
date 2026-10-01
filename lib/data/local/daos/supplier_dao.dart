@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../domain/sync_id.dart';
 import '../database.dart';
 import '../tables/suppliers_table.dart';
 
@@ -12,6 +13,6 @@ class SupplierDao extends DatabaseAccessor<AppDatabase>
 
   Stream<List<Supplier>> watchAll() => select(suppliers).watch();
 
-  Future<int> insertSupplier(SuppliersCompanion entry) =>
-      into(suppliers).insert(entry);
+  Future<int> insertSupplier(SuppliersCompanion entry) => into(suppliers)
+      .insert(entry.copyWith(syncId: Value(generateSyncId())));
 }

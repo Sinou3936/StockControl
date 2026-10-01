@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../domain/sync_id.dart';
 import '../database.dart';
 import '../tables/stock_movements_table.dart';
 
@@ -11,7 +12,8 @@ class StockMovementDao extends DatabaseAccessor<AppDatabase>
   StockMovementDao(super.db);
 
   Future<int> insertMovement(StockMovementsCompanion entry) =>
-      into(stockMovements).insert(entry);
+      into(stockMovements)
+          .insert(entry.copyWith(syncId: Value(generateSyncId())));
 
   Future<List<StockMovement>> movementsForLot(int lotId) =>
       (select(stockMovements)..where((m) => m.lotId.equals(lotId))).get();

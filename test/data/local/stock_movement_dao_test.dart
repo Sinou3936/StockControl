@@ -45,4 +45,20 @@ void main() {
     expect(movements, hasLength(1));
     expect(movements.first.type, 'inbound');
   });
+
+  test('insertMovement always generates a syncId', () async {
+    final movementId = await db.stockMovementDao.insertMovement(
+      StockMovementsCompanion.insert(
+        lotId: lotId,
+        type: 'inbound',
+        quantity: 100,
+        occurredAt: DateTime(2026, 9, 3),
+      ),
+    );
+
+    final movements = await db.stockMovementDao.movementsForLot(lotId);
+    final saved = movements.firstWhere((m) => m.id == movementId);
+
+    expect(saved.syncId, isNotNull);
+  });
 }

@@ -28,4 +28,21 @@ void main() {
     expect(ingredients.first.name, '양파');
     expect(ingredients.first.conversionFactor, 20000);
   });
+
+  test('insertIngredient always generates a syncId', () async {
+    final id = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+      ),
+    );
+
+    final ingredients = await db.ingredientDao.watchAll().first;
+    final saved = ingredients.firstWhere((i) => i.id == id);
+
+    expect(saved.syncId, isNotNull);
+  });
 }

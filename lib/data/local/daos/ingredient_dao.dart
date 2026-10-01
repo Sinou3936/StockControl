@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../domain/sync_id.dart';
 import '../database.dart';
 import '../tables/ingredients_table.dart';
 
@@ -12,6 +13,6 @@ class IngredientDao extends DatabaseAccessor<AppDatabase>
 
   Stream<List<Ingredient>> watchAll() => select(ingredients).watch();
 
-  Future<int> insertIngredient(IngredientsCompanion entry) =>
-      into(ingredients).insert(entry);
+  Future<int> insertIngredient(IngredientsCompanion entry) => into(ingredients)
+      .insert(entry.copyWith(syncId: Value(generateSyncId())));
 }
