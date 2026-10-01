@@ -12,6 +12,8 @@ class AuthSession {
     required this.pin,
     required this.displayName,
     required this.role,
+    this.storeId,
+    this.storeName,
   });
 
   final String id;
@@ -19,6 +21,8 @@ class AuthSession {
   final String pin;
   final String displayName;
   final String role;
+  final String? storeId;
+  final String? storeName;
 
   bool get isOwner => role == 'owner';
 }

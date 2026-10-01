@@ -160,6 +160,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               pin: pin,
               displayName: result.displayName!,
               role: result.role!,
+              storeId: result.storeId,
+              storeName: result.storeName,
             ),
           );
       return;
