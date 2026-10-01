@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/dao_providers.dart';
+import '../../core/providers/store_providers.dart';
 import '../../data/local/database.dart';
 import '../../domain/stock_overview.dart';
+import '../stock/store_switcher.dart';
 import '../stock_adjustment/stock_adjustment_form_screen.dart';
 
 class StockOverviewScreen extends ConsumerWidget {
@@ -12,21 +14,37 @@ class StockOverviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dao = ref.watch(lotDaoProvider);
+    final storeId = ref.watch(activeStoreIdProvider);
+    final storeDao = ref.watch(storeDaoProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('재고 조회')),
-      body: StreamBuilder<List<LotWithIngredient>>(
-        stream: dao.watchAvailableLotsWithIngredient(),
-        builder: (context, snapshot) {
-          final groups = groupLotsByIngredient(
-            snapshot.data ?? [],
-            now: DateTime.now(),
-          );
+      appBar: AppBar(
+        title: const Text('재고 조회'),
+        actions: const [StoreSwitcher()],
+      ),
+      body: StreamBuilder<List<Store>>(
+        stream: storeDao.watchAll(),
+        builder: (context, storeSnapshot) {
+          final storeNames = {
+            for (final s in storeSnapshot.data ?? <Store>[]) s.id: s.name,
+          };
 
-          return ListView.builder(
-            itemCount: groups.length,
-            itemBuilder: (context, index) =>
-                _IngredientGroupSection(group: groups[index]),
+          return StreamBuilder<List<LotWithIngredient>>(
+            stream: dao.watchAvailableLotsWithIngredient(storeId: storeId),
+            builder: (context, snapshot) {
+              final groups = groupLotsByIngredient(
+                snapshot.data ?? [],
+                now: DateTime.now(),
+              );
+
+              return ListView.builder(
+                itemCount: groups.length,
+                itemBuilder: (context, index) => _IngredientGroupSection(
+                  group: groups[index],
+                  storeNames: storeNames,
+                ),
+              );
+            },
           );
         },
       ),
@@ -35,9 +53,13 @@ class StockOverviewScreen extends ConsumerWidget {
 }
 
 class _IngredientGroupSection extends StatelessWidget {
-  const _IngredientGroupSection({required this.group});
+  const _IngredientGroupSection({
+    required this.group,
+    required this.storeNames,
+  });
 
   final IngredientStockGroup group;
+  final Map<String, String> storeNames;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +79,7 @@ class _IngredientGroupSection extends StatelessWidget {
             lot: lot,
             ingredient: group.ingredient,
             now: DateTime.now(),
+            storeName: storeNames[lot.storeId],
           ),
       ],
     );
@@ -68,11 +91,13 @@ class _LotRow extends StatelessWidget {
     required this.lot,
     required this.ingredient,
     required this.now,
+    this.storeName,
   });
 
   final Lot lot;
   final Ingredient ingredient;
   final DateTime now;
+  final String? storeName;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +120,14 @@ class _LotRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
           children: [
+            if (storeName != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  storeName!,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ),
             Expanded(child: Text(expiryText)),
             if (near)
               const Padding(
