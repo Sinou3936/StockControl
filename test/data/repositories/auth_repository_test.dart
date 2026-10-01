@@ -142,6 +142,8 @@ void main() {
       pin: '111111',
       ownerEmail: 'owner@internal.local',
       ownerPin: '123456',
+      storeId: 'store-1',
+      storeName: '울산점',
     );
 
     final cachedProfiles = await db.cachedProfileDao.watchAll().first;
@@ -163,5 +165,62 @@ void main() {
 
     expect(result.outcome, AuthOutcome.success);
     expect(result.displayName, '직원1');
+  });
+
+  test('login carries the store id and name from the profile', () async {
+    final gateway = FakeAuthGateway()
+      ..seedUser(
+        id: 'user-10',
+        email: 'staff10@internal.local',
+        password: '111111',
+        displayName: '직원10',
+        role: 'staff',
+        storeId: 'store-1',
+        storeName: '울산점',
+      );
+
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
+
+    final result = await repository.login(
+      id: 'user-10',
+      email: 'staff10@internal.local',
+      pin: '111111',
+    );
+
+    expect(result.storeId, 'store-1');
+    expect(result.storeName, '울산점');
+
+    final cached = await db.cachedProfileDao.getById('user-10');
+    expect(cached!.storeId, 'store-1');
+    expect(cached.storeName, '울산점');
+  });
+
+  test('addStaff caches the selected store id and name for the new staff',
+      () async {
+    final gateway = FakeAuthGateway()
+      ..seedUser(
+        id: 'user-1',
+        email: 'owner@internal.local',
+        password: '123456',
+        displayName: '사장님',
+        role: 'owner',
+      );
+
+    final repository = AuthRepository(gateway, db.cachedProfileDao);
+
+    await repository.addStaff(
+      displayName: '직원1',
+      pin: '111111',
+      ownerEmail: 'owner@internal.local',
+      ownerPin: '123456',
+      storeId: 'store-1',
+      storeName: '울산점',
+    );
+
+    final cachedProfiles = await db.cachedProfileDao.watchAll().first;
+    final staff = cachedProfiles.singleWhere((p) => p.role == 'staff');
+
+    expect(staff.storeId, 'store-1');
+    expect(staff.storeName, '울산점');
   });
 }

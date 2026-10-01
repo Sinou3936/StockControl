@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/pin_hash.dart';
@@ -13,12 +14,16 @@ class AuthResult {
     this.userId,
     this.displayName,
     this.role,
+    this.storeId,
+    this.storeName,
   });
 
   final AuthOutcome outcome;
   final String? userId;
   final String? displayName;
   final String? role;
+  final String? storeId;
+  final String? storeName;
 }
 
 class AuthRepository {
@@ -40,6 +45,9 @@ class AuthRepository {
       final profileRow = await _gateway.fetchProfile(user.id);
       final displayName = profileRow['display_name'] as String;
       final role = profileRow['role'] as String;
+      final storeId = profileRow['store_id'] as String?;
+      final storeName =
+          (profileRow['stores'] as Map<String, dynamic>?)?['name'] as String?;
 
       final salt = generatePinSalt();
       await _cachedProfileDao.upsertProfile(
@@ -50,6 +58,8 @@ class AuthRepository {
           email: email,
           pinHash: hashPin(pin, salt),
           pinSalt: salt,
+          storeId: Value(storeId),
+          storeName: Value(storeName),
         ),
       );
 
@@ -58,6 +68,8 @@ class AuthRepository {
         userId: user.id,
         displayName: displayName,
         role: role,
+        storeId: storeId,
+        storeName: storeName,
       );
     } on AuthRetryableFetchException {
       if (id == null) {
@@ -73,6 +85,8 @@ class AuthRepository {
           userId: cached.id,
           displayName: cached.displayName,
           role: cached.role,
+          storeId: cached.storeId,
+          storeName: cached.storeName,
         );
       }
       return AuthResult(outcome: AuthOutcome.invalidPin);
@@ -86,6 +100,8 @@ class AuthRepository {
     required String pin,
     required String ownerEmail,
     required String ownerPin,
+    required String storeId,
+    required String storeName,
   }) async {
     final syntheticEmail =
         'staff-${DateTime.now().millisecondsSinceEpoch}@internal.local';
@@ -99,6 +115,7 @@ class AuthRepository {
       id: newUser.id,
       displayName: displayName,
       role: 'staff',
+      storeId: storeId,
     );
 
     // 이 기기의 로그인 화면 이름 목록에 바로 뜨고, 곧바로 PIN으로 로그인할 수
@@ -115,6 +132,8 @@ class AuthRepository {
         email: syntheticEmail,
         pinHash: hashPin(pin, salt),
         pinSalt: salt,
+        storeId: Value(storeId),
+        storeName: Value(storeName),
       ),
     );
 

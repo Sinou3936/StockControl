@@ -1107,7 +1107,11 @@ void main() {
     await tester.pumpWidget(wrap());
     await tester.pump();
 
-    expect(find.text('울산점'), findsOneWidget);
+    final dropdown = tester.widget<DropdownButton<Store>>(
+      find.byKey(const Key('newStaffStoreDropdown')),
+    );
+    expect(dropdown.items, hasLength(1));
+    expect(dropdown.items!.first.value!.name, '울산점');
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
@@ -1244,6 +1248,8 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
 
 Run: `flutter test test/features/auth/add_staff_screen_test.dart`
 Expected: PASS (2 tests passed)
+
+**실행 중 발견한 문제**: `DropdownButton`는 닫혀있는 상태에서 `hint`만 보여주고 `DropdownMenuItem`들은 메뉴를 열어야 오버레이에 렌더링된다 — 그래서 `find.text('울산점')`로는 아무것도 못 찾는다(위 코드에 이미 반영: 메뉴를 여는 대신 `tester.widget<DropdownButton<Store>>(...).items`로 직접 확인한다).
 
 - [ ] **Step 9: 정적 분석 확인**
 
