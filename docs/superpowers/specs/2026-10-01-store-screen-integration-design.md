@@ -66,7 +66,7 @@ Stream<List<LotWithIngredient>> watchAvailableLotsWithIngredient({
 
 - `storeId`가 `null`이면 기존처럼 전체 로트
 - `storeId`가 있으면 `lots.storeId.equals(storeId)` 조건 추가
-- 반환 타입 `LotWithIngredient`에 매장 이름(`storeName`, nullable)을 추가해서 화면이 각 행에 매장을 표시할 수 있게 한다 — `Lots` 테이블과 `Stores` 테이블을 outer join(매장이 없는 옛날 로트도 깨지지 않게)
+- `LotWithIngredient`/`IngredientStockGroup`/`groupLotsByIngredient`는 손대지 않는다 — `Lot`에는 이미 1차에서 추가한 `storeId`가 있으므로, 매장 이름이 필요한 화면이 `storeDaoProvider.watchAll()`(이미 로컬에 동기화되어 있는 매장 캐시)을 따로 watch해서 `storeId → 이름` 맵을 만들고 각 로트의 `storeId`로 조회하면 된다. DAO 쿼리에 join을 추가할 필요가 없다.
 
 ### 입고 등록 — 매장 기록 + 매장 미선택 시 막기
 
@@ -104,13 +104,11 @@ lib/
         lot_dao.dart                 # 수정: watchAvailableLotsWithIngredient에 storeId 필터
     repositories/
       lot_repository.dart            # 수정: receiveLot에 storeId 추가
-  domain/
-    stock_overview.dart              # 수정: LotWithIngredient에 storeName 추가 (필요 시)
 ```
 
 ## 테스트 전략
 
-- `LotDao`: storeId로 필터링됐을 때/안 됐을 때 각각 올바른 로트만 나오는지, 매장 이름이 join되어 나오는지 테스트
+- `LotDao`: storeId로 필터링됐을 때/안 됐을 때 각각 올바른 로트만 나오는지 테스트
 - `LotRepository.receiveLot`: storeId가 제대로 저장되는지 테스트
 - `StockOverviewScreen`: 매장 선택 시 그 매장 로트만, 전체 합산 시 전체 + 매장 이름 표시 테스트
 - `InboundFormScreen`/`CountScreen`: 매장 미선택(사장·전체 합산) 상태에서 폼 대신 안내가 뜨는지, 매장 선택 후에는 정상 동작하는지 테스트
