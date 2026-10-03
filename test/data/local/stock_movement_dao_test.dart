@@ -61,4 +61,21 @@ void main() {
 
     expect(saved.syncId, isNotNull);
   });
+
+  test('insertMovement also enqueues a sync entry for the new row', () async {
+    await db.delete(db.syncQueue).go();
+
+    final movementId = await db.stockMovementDao.insertMovement(
+      StockMovementsCompanion.insert(
+        lotId: lotId,
+        type: 'inbound',
+        quantity: 500,
+        occurredAt: DateTime(2026, 9, 3),
+      ),
+    );
+
+    final queued = await db.syncQueueDao.oldest();
+    expect(queued!.targetTable, 'stock_movements');
+    expect(queued.recordId, movementId);
+  });
 }

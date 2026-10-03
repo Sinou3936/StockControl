@@ -118,4 +118,21 @@ void main() {
     final lot = await db.lotDao.getById(lotId);
     expect(lot.syncId, isNotNull);
   });
+
+  test('insertLot also enqueues a sync entry for the new row', () async {
+    await db.delete(db.syncQueue).go();
+
+    final lotId = await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        receivedDate: DateTime(2026, 9, 3),
+        unitCost: 15.0,
+        remainingQty: 1000,
+      ),
+    );
+
+    final queued = await db.syncQueueDao.oldest();
+    expect(queued!.targetTable, 'lots');
+    expect(queued.recordId, lotId);
+  });
 }

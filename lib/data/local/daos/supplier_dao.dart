@@ -13,6 +13,12 @@ class SupplierDao extends DatabaseAccessor<AppDatabase>
 
   Stream<List<Supplier>> watchAll() => select(suppliers).watch();
 
-  Future<int> insertSupplier(SuppliersCompanion entry) => into(suppliers)
-      .insert(entry.copyWith(syncId: Value(generateSyncId())));
+  Future<int> insertSupplier(SuppliersCompanion entry) {
+    return attachedDatabase.transaction(() async {
+      final id = await into(suppliers)
+          .insert(entry.copyWith(syncId: Value(generateSyncId())));
+      await attachedDatabase.syncQueueDao.enqueue('suppliers', id);
+      return id;
+    });
+  }
 }

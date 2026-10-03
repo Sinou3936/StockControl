@@ -13,6 +13,12 @@ class IngredientDao extends DatabaseAccessor<AppDatabase>
 
   Stream<List<Ingredient>> watchAll() => select(ingredients).watch();
 
-  Future<int> insertIngredient(IngredientsCompanion entry) => into(ingredients)
-      .insert(entry.copyWith(syncId: Value(generateSyncId())));
+  Future<int> insertIngredient(IngredientsCompanion entry) {
+    return attachedDatabase.transaction(() async {
+      final id = await into(ingredients)
+          .insert(entry.copyWith(syncId: Value(generateSyncId())));
+      await attachedDatabase.syncQueueDao.enqueue('ingredients', id);
+      return id;
+    });
+  }
 }

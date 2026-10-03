@@ -187,4 +187,23 @@ void main() {
     final lot = await db.lotDao.getById(lotId);
     expect(lot.storeId, 'store-1');
   });
+
+  test('receiveLot enqueues the lot before its inbound movement, preserving '
+      'FK-safe push order', () async {
+    await db.delete(db.syncQueue).go();
+
+    await repository.receiveLot(
+      ingredientId: ingredientId,
+      receivedDate: DateTime(2026, 9, 3),
+      unitCost: 15.0,
+      baseQty: 1000,
+    );
+
+    final first = await db.syncQueueDao.oldest();
+    expect(first!.targetTable, 'lots');
+    await db.syncQueueDao.remove(first.id);
+
+    final second = await db.syncQueueDao.oldest();
+    expect(second!.targetTable, 'stock_movements');
+  });
 }

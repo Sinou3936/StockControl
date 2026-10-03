@@ -11,8 +11,14 @@ part 'lot_dao.g.dart';
 class LotDao extends DatabaseAccessor<AppDatabase> with _$LotDaoMixin {
   LotDao(super.db);
 
-  Future<int> insertLot(LotsCompanion entry) =>
-      into(lots).insert(entry.copyWith(syncId: Value(generateSyncId())));
+  Future<int> insertLot(LotsCompanion entry) {
+    return attachedDatabase.transaction(() async {
+      final id = await into(lots)
+          .insert(entry.copyWith(syncId: Value(generateSyncId())));
+      await attachedDatabase.syncQueueDao.enqueue('lots', id);
+      return id;
+    });
+  }
 
   Future<Lot> getById(int id) =>
       (select(lots)..where((l) => l.id.equals(id))).getSingle();

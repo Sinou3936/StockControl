@@ -55,4 +55,14 @@ void main() {
 
     expect(syncIds, hasLength(suppliers.length));
   });
+
+  test('insertSupplier also enqueues a sync entry for the new row', () async {
+    final id = await db.supplierDao.insertSupplier(
+      SuppliersCompanion.insert(name: '거래처D'),
+    );
+
+    final queued = await db.syncQueueDao.oldest();
+    expect(queued!.targetTable, 'suppliers');
+    expect(queued.recordId, id);
+  });
 }

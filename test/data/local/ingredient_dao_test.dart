@@ -45,4 +45,21 @@ void main() {
 
     expect(saved.syncId, isNotNull);
   });
+
+  test('insertIngredient also enqueues a sync entry for the new row',
+      () async {
+    final id = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '당근',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 10000,
+        isExpiryTracked: false,
+      ),
+    );
+
+    final queued = await db.syncQueueDao.oldest();
+    expect(queued!.targetTable, 'ingredients');
+    expect(queued.recordId, id);
+  });
 }
