@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart';
+
 import '../local/database.dart';
 import '../services/sync_gateway.dart';
 
@@ -6,6 +8,13 @@ class SyncRepository {
 
   final SyncGateway _gateway;
   final AppDatabase _db;
+
+  static const _pullOrder = [
+    'suppliers',
+    'ingredients',
+    'lots',
+    'stock_movements',
+  ];
 
   Future<void> pushPending() async {
     while (true) {
@@ -24,6 +33,31 @@ class SyncRepository {
         return;
       }
       await _db.syncQueueDao.remove(entry.id);
+    }
+  }
+
+  Future<void> pullUpdates({required bool isOwner, String? storeId}) async {
+    for (final tableName in _pullOrder) {
+      final storeScoped =
+          tableName == 'lots' || tableName == 'stock_movements';
+      final filterStoreId = (!isOwner && storeScoped) ? storeId : null;
+
+      final cursor = await _db.syncCursorDao.getLastSyncedAt(tableName);
+      final rows = await _gateway.fetchSince(
+        tableName,
+        cursor,
+        storeId: filterStoreId,
+      );
+      if (rows.isEmpty) continue;
+
+      for (final row in rows) {
+        await _applyPulledRow(tableName, row);
+      }
+
+      final latest = rows
+          .map((r) => DateTime.parse(r['synced_at'] as String))
+          .reduce((a, b) => a.isAfter(b) ? a : b);
+      await _db.syncCursorDao.setLastSyncedAt(tableName, latest);
     }
   }
 
@@ -106,5 +140,110 @@ class SyncRepository {
       default:
         return null;
     }
+  }
+
+  Future<void> _applyPulledRow(
+    String tableName,
+    Map<String, dynamic> row,
+  ) async {
+    final syncId = row['id'] as String;
+
+    switch (tableName) {
+      case 'suppliers':
+        if (await _findSupplierLocalId(syncId) != null) return;
+        await _db.into(_db.suppliers).insert(
+              SuppliersCompanion.insert(
+                name: row['name'] as String,
+                contact: Value(row['contact'] as String?),
+                memo: Value(row['memo'] as String?),
+                syncId: Value(syncId),
+              ),
+            );
+      case 'ingredients':
+        if (await _findIngredientLocalId(syncId) != null) return;
+        await _db.into(_db.ingredients).insert(
+              IngredientsCompanion.insert(
+                name: row['name'] as String,
+                category: Value(row['category'] as String?),
+                baseUnit: row['base_unit'] as String,
+                purchaseUnit: row['purchase_unit'] as String,
+                conversionFactor: (row['conversion_factor'] as num).toDouble(),
+                isExpiryTracked: row['is_expiry_tracked'] as bool,
+                safetyStockQty: Value(
+                  (row['safety_stock_qty'] as num?)?.toDouble(),
+                ),
+                syncId: Value(syncId),
+              ),
+            );
+      case 'lots':
+        if (await _findLotLocalId(syncId) != null) return;
+        final ingredientLocalId = await _findIngredientLocalId(
+          row['ingredient_id'] as String,
+        );
+        if (ingredientLocalId == null) return;
+        int? supplierLocalId;
+        if (row['supplier_id'] != null) {
+          supplierLocalId =
+              await _findSupplierLocalId(row['supplier_id'] as String);
+        }
+        await _db.into(_db.lots).insert(
+              LotsCompanion.insert(
+                ingredientId: ingredientLocalId,
+                supplierId: Value(supplierLocalId),
+                storeId: Value(row['store_id'] as String?),
+                receivedDate: DateTime.parse(row['received_date'] as String),
+                expiryDate: Value(
+                  row['expiry_date'] == null
+                      ? null
+                      : DateTime.parse(row['expiry_date'] as String),
+                ),
+                unitCost: (row['unit_cost'] as num).toDouble(),
+                remainingQty: 0,
+                syncId: Value(syncId),
+              ),
+            );
+      case 'stock_movements':
+        if (await _findStockMovementLocalId(syncId) != null) return;
+        final lotLocalId = await _findLotLocalId(row['lot_id'] as String);
+        if (lotLocalId == null) return;
+        await _db.into(_db.stockMovements).insert(
+              StockMovementsCompanion.insert(
+                lotId: lotLocalId,
+                type: row['type'] as String,
+                quantity: (row['quantity'] as num).toDouble(),
+                occurredAt: DateTime.parse(row['occurred_at'] as String),
+                memo: Value(row['memo'] as String?),
+                syncId: Value(syncId),
+              ),
+            );
+    }
+  }
+
+  Future<int?> _findSupplierLocalId(String syncId) async {
+    final row = await (_db.select(_db.suppliers)
+          ..where((t) => t.syncId.equals(syncId)))
+        .getSingleOrNull();
+    return row?.id;
+  }
+
+  Future<int?> _findIngredientLocalId(String syncId) async {
+    final row = await (_db.select(_db.ingredients)
+          ..where((t) => t.syncId.equals(syncId)))
+        .getSingleOrNull();
+    return row?.id;
+  }
+
+  Future<int?> _findLotLocalId(String syncId) async {
+    final row = await (_db.select(_db.lots)
+          ..where((t) => t.syncId.equals(syncId)))
+        .getSingleOrNull();
+    return row?.id;
+  }
+
+  Future<int?> _findStockMovementLocalId(String syncId) async {
+    final row = await (_db.select(_db.stockMovements)
+          ..where((t) => t.syncId.equals(syncId)))
+        .getSingleOrNull();
+    return row?.id;
   }
 }

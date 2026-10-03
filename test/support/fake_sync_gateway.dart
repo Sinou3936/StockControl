@@ -38,8 +38,8 @@ class FakeSyncGateway implements SyncGateway {
     final rows = tableRows[tableName] ?? [];
     return rows.where((row) {
       if (since != null) {
-        final createdAt = DateTime.parse(row['created_at'] as String);
-        if (!createdAt.isAfter(since)) return false;
+        final syncedAt = DateTime.parse(row['synced_at'] as String);
+        if (!syncedAt.isAfter(since)) return false;
       }
       if (storeId != null && row['store_id'] != storeId) return false;
       return true;

@@ -102,4 +102,157 @@ void main() {
 
     expect(gateway.tableRows['suppliers'], hasLength(1));
   });
+
+  test('pullUpdates inserts suppliers and ingredients regardless of role',
+      () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['suppliers'] = [
+      {
+        'id': 'supplier-syncid-1',
+        'name': '서버거래처',
+        'contact': null,
+        'memo': null,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: false, storeId: 'store-1');
+
+    final suppliers = await db.supplierDao.watchAll().first;
+    expect(suppliers, hasLength(1));
+    expect(suppliers.first.name, '서버거래처');
+    expect(suppliers.first.syncId, 'supplier-syncid-1');
+  });
+
+  test('pullUpdates filters lots by storeId for a non-owner', () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [
+      {
+        'id': 'ingredient-syncid-1',
+        'name': '당근',
+        'category': null,
+        'base_unit': 'g',
+        'purchase_unit': '박스',
+        'conversion_factor': 10000,
+        'is_expiry_tracked': false,
+        'safety_stock_qty': null,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+    ];
+    gateway.tableRows['lots'] = [
+      {
+        'id': 'lot-syncid-1',
+        'ingredient_id': 'ingredient-syncid-1',
+        'supplier_id': null,
+        'store_id': 'store-1',
+        'received_date': DateTime(2026, 10, 1).toIso8601String(),
+        'expiry_date': null,
+        'unit_cost': 10,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+      {
+        'id': 'lot-syncid-2',
+        'ingredient_id': 'ingredient-syncid-1',
+        'supplier_id': null,
+        'store_id': 'store-2',
+        'received_date': DateTime(2026, 10, 1).toIso8601String(),
+        'expiry_date': null,
+        'unit_cost': 10,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: false, storeId: 'store-1');
+
+    // pull으로 받은 로트는 remainingQty가 0으로 만들어진다(알려진 한계).
+    // watchAvailableLotsWithIngredient는 잔량 > 0만 보므로 테이블을 직접 조회한다.
+    final pulledLots = await db.select(db.lots).get();
+    expect(pulledLots, hasLength(1));
+    expect(pulledLots.first.syncId, 'lot-syncid-1');
+    expect(pulledLots.first.storeId, 'store-1');
+    expect(pulledLots.first.remainingQty, 0);
+  });
+
+  test('pullUpdates skips a row whose syncId already exists locally',
+      () async {
+    final gateway = FakeSyncGateway();
+    final existingId = await db.supplierDao.insertSupplier(
+      SuppliersCompanion.insert(name: '이미있음'),
+    );
+    final existing = await db.supplierDao.watchAll().first;
+    final existingSyncId =
+        existing.firstWhere((s) => s.id == existingId).syncId;
+
+    gateway.tableRows['suppliers'] = [
+      {
+        'id': existingSyncId,
+        'name': '서버에서온이름',
+        'contact': null,
+        'memo': null,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    final suppliers = await db.supplierDao.watchAll().first;
+    expect(suppliers, hasLength(1));
+    expect(suppliers.first.name, '이미있음');
+  });
+
+  test('pullUpdates accepts whole-number JSON for real columns', () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [
+      {
+        'id': 'ingredient-int-1',
+        'name': '감자',
+        'category': null,
+        'base_unit': 'g',
+        'purchase_unit': '박스',
+        'conversion_factor': 20000,
+        'is_expiry_tracked': false,
+        'safety_stock_qty': 500,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    final ingredients = await db.ingredientDao.watchAll().first;
+    expect(ingredients.single.conversionFactor, 20000.0);
+    expect(ingredients.single.safetyStockQty, 500.0);
+  });
+
+  test('a second pullUpdates only fetches rows synced after the cursor',
+      () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['suppliers'] = [
+      {
+        'id': 'supplier-old',
+        'name': '옛날',
+        'contact': null,
+        'memo': null,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+    await repository.pullUpdates(isOwner: true);
+
+    gateway.tableRows['suppliers']!.add({
+      'id': 'supplier-late',
+      'name': '늦게도착',
+      'contact': null,
+      'memo': null,
+      'synced_at': DateTime(2026, 10, 2).toIso8601String(),
+    });
+    await repository.pullUpdates(isOwner: true);
+
+    final suppliers = await db.supplierDao.watchAll().first;
+    expect(suppliers.map((s) => s.name), containsAll(['옛날', '늦게도착']));
+    expect(suppliers, hasLength(2));
+  });
 }

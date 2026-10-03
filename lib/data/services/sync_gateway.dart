@@ -27,7 +27,7 @@ class SupabaseSyncGateway implements SyncGateway {
   }) async {
     var query = _client.from(tableName).select();
     if (since != null) {
-      query = query.gt('created_at', since.toIso8601String());
+      query = query.gt('synced_at', since.toIso8601String());
     }
     if (storeId != null) {
       query = query.eq('store_id', storeId);
