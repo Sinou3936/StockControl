@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -65,8 +66,9 @@ class SyncController extends StateNotifier<SyncStatus> {
     String? error;
     try {
       await _ref.read(storeRepositoryProvider).refreshFromServer();
-    } catch (_) {
+    } catch (e) {
       // 매장 목록을 못 받아도 재고 동기화는 계속 진행
+      debugPrint('[sync] 매장 목록 갱신 실패: $e');
     }
     try {
       final repository = _ref.read(syncRepositoryProvider);
@@ -76,8 +78,9 @@ class SyncController extends StateNotifier<SyncStatus> {
         storeId: session.storeId,
       );
       if (!drained) error = '일부 변경을 서버로 보내지 못했습니다';
-    } catch (_) {
+    } catch (e, stack) {
       error = '서버에 연결할 수 없습니다';
+      debugPrint('[sync] 동기화 실패: $e\n$stack');
     }
 
     if (!mounted) return;

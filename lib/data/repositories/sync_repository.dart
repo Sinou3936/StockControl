@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../local/database.dart';
 import '../services/sync_gateway.dart';
@@ -30,7 +31,8 @@ class SyncRepository {
 
       try {
         await _gateway.upsert(entry.targetTable, payload);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[sync] ${entry.targetTable} 전송 실패: $e');
         return false;
       }
       await _db.syncQueueDao.remove(entry.id);
