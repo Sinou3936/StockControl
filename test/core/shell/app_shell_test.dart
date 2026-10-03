@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
+import 'package:stockcontrol/core/providers/sync_providers.dart';
 import 'package:stockcontrol/core/shell/app_shell.dart';
 import 'package:stockcontrol/core/shell/more_screen.dart';
 import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/features/supplier_management/supplier_list_screen.dart';
+
+import '../../support/fake_sync_controller.dart';
 
 void main() {
   late AppDatabase db;
@@ -164,6 +167,41 @@ void main() {
     await tester.pump();
 
     expect(container.read(authSessionProvider), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('desktop sidebar sync button runs a sync', (tester) async {
+    late FakeSyncController fake;
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        syncControllerProvider.overrideWith((ref) {
+          fake = FakeSyncController(ref);
+          return fake;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AppShell()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('syncButton')));
+    await tester.pump();
+
+    expect(fake.syncCalls, 1);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

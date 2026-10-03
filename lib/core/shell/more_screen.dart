@@ -63,20 +63,11 @@ class _SyncTile extends StatelessWidget {
   final SyncStatus status;
   final VoidCallback onTap;
 
-  String get _subtitle {
-    if (status.isSyncing) return '동기화 중...';
-    if (status.errorMessage != null) return status.errorMessage!;
-    final at = status.lastSyncedAt;
-    if (at == null) return '아직 동기화하지 않았습니다';
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '마지막 동기화 ${two(at.hour)}:${two(at.minute)}:${two(at.second)}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListTile(
       title: const Text('지금 동기화'),
-      subtitle: Text(_subtitle),
+      subtitle: Text(status.description),
       trailing: status.isSyncing
           ? const SizedBox(
               width: 20,

@@ -30,6 +30,15 @@ class SyncStatus {
   final bool isSyncing;
   final DateTime? lastSyncedAt;
   final String? errorMessage;
+
+  String get description {
+    if (isSyncing) return '동기화 중...';
+    if (errorMessage != null) return errorMessage!;
+    final at = lastSyncedAt;
+    if (at == null) return '아직 동기화하지 않았습니다';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '마지막 동기화 ${two(at.hour)}:${two(at.minute)}:${two(at.second)}';
+  }
 }
 
 class SyncController extends StateNotifier<SyncStatus> {

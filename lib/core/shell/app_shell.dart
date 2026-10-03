@@ -7,6 +7,7 @@ import '../../features/inbound/inbound_form_screen.dart';
 import '../../features/stock_overview/stock_overview_screen.dart';
 import '../../features/supplier_management/supplier_list_screen.dart';
 import '../providers/auth_providers.dart';
+import '../providers/sync_providers.dart';
 import 'auth_add_staff_route.dart';
 import 'more_screen.dart';
 import 'store_management_route.dart';
@@ -102,12 +103,19 @@ class _AppShellState extends ConsumerState<AppShell> {
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: IconButton(
-                    key: const Key('logoutButton'),
-                    icon: const Icon(Icons.logout),
-                    tooltip: '로그아웃',
-                    onPressed: () =>
-                        ref.read(authSessionProvider.notifier).clear(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSyncButton(),
+                      const SizedBox(height: 8),
+                      IconButton(
+                        key: const Key('logoutButton'),
+                        icon: const Icon(Icons.logout),
+                        tooltip: '로그아웃',
+                        onPressed: () =>
+                            ref.read(authSessionProvider.notifier).clear(),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -126,6 +134,54 @@ class _AppShellState extends ConsumerState<AppShell> {
         ],
       ),
     );
+  }
+
+  Widget _buildSyncButton() {
+    final status = ref.watch(syncControllerProvider);
+    final hasError = status.errorMessage != null;
+
+    return Tooltip(
+      message: status.description,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: const Key('syncButton'),
+            icon: status.isSyncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    hasError ? Icons.sync_problem : Icons.sync,
+                    color: hasError ? Colors.red : null,
+                  ),
+            onPressed: status.isSyncing
+                ? null
+                : () => ref.read(syncControllerProvider.notifier).sync(),
+          ),
+          Text(
+            status.isSyncing
+                ? '동기화 중'
+                : hasError
+                    ? '실패'
+                    : status.lastSyncedAt == null
+                        ? '동기화'
+                        : _formatTime(status.lastSyncedAt!),
+            style: TextStyle(
+              fontSize: 11,
+              color: hasError ? Colors.red : Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime at) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(at.hour)}:${two(at.minute)}:${two(at.second)}';
   }
 
   Widget _buildMobile() {
