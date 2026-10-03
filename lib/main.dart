@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
 import 'core/providers/auth_providers.dart';
+import 'core/providers/store_providers.dart';
 import 'core/providers/sync_providers.dart';
 import 'core/shell/app_shell.dart';
 import 'features/auth/login_screen.dart';
@@ -35,6 +36,11 @@ class _StockControlAppState extends ConsumerState<StockControlApp> {
   Future<void> _runSync() async {
     final session = ref.read(authSessionProvider);
     if (session == null) return;
+    try {
+      await ref.read(storeRepositoryProvider).refreshFromServer();
+    } catch (_) {
+      // 매장 목록을 못 받아도 로컬 데이터 동기화는 계속 진행
+    }
     try {
       final repository = ref.read(syncRepositoryProvider);
       await repository.pushPending();
