@@ -24,8 +24,9 @@ void main() {
       SuppliersCompanion.insert(name: '거래처A'),
     );
 
-    await repository.pushPending();
+    final drained = await repository.pushPending();
 
+    expect(drained, isTrue);
     expect(gateway.upsertedPayloads, hasLength(1));
     expect(gateway.upsertedPayloads.first['name'], '거래처A');
     expect(await db.syncQueueDao.oldest(), isNull);
@@ -78,8 +79,9 @@ void main() {
       SuppliersCompanion.insert(name: '거래처C'),
     );
 
-    await repository.pushPending();
+    final drained = await repository.pushPending();
 
+    expect(drained, isFalse);
     expect(gateway.upsertedPayloads, hasLength(1));
     final remaining = await db.syncQueueDao.oldest();
     expect(remaining, isNotNull);
@@ -254,5 +256,82 @@ void main() {
     final suppliers = await db.supplierDao.watchAll().first;
     expect(suppliers.map((s) => s.name), containsAll(['옛날', '늦게도착']));
     expect(suppliers, hasLength(2));
+  });
+
+  Map<String, dynamic> pulledIngredient() => {
+        'id': 'ingredient-1',
+        'name': '당근',
+        'category': null,
+        'base_unit': 'g',
+        'purchase_unit': '박스',
+        'conversion_factor': 10000,
+        'is_expiry_tracked': false,
+        'safety_stock_qty': null,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      };
+
+  Map<String, dynamic> pulledLot() => {
+        'id': 'lot-1',
+        'ingredient_id': 'ingredient-1',
+        'supplier_id': null,
+        'store_id': 'store-1',
+        'received_date': DateTime(2026, 10, 1).toIso8601String(),
+        'expiry_date': null,
+        'unit_cost': 10,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      };
+
+  Map<String, dynamic> pulledMovement(String id, num quantity) => {
+        'id': id,
+        'lot_id': 'lot-1',
+        'store_id': 'store-1',
+        'type': 'inbound',
+        'quantity': quantity,
+        'occurred_at': DateTime(2026, 10, 1).toIso8601String(),
+        'memo': null,
+        'synced_at': DateTime(2026, 10, 1).toIso8601String(),
+      };
+
+  test('pullUpdates sets a pulled lot\'s remainingQty to the sum of its '
+      'pulled movements', () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [pulledIngredient()];
+    gateway.tableRows['lots'] = [pulledLot()];
+    gateway.tableRows['stock_movements'] = [
+      pulledMovement('movement-1', 1000),
+      pulledMovement('movement-2', -300),
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    final lot = await (db.select(db.lots)
+          ..where((t) => t.syncId.equals('lot-1')))
+        .getSingle();
+    expect(lot.remainingQty, 700);
+
+    final visible = await db.lotDao.watchAvailableLotsWithIngredient().first;
+    expect(visible, hasLength(1));
+  });
+
+  test('pullUpdates applies a later movement from another device to an '
+      'existing lot', () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [pulledIngredient()];
+    gateway.tableRows['lots'] = [pulledLot()];
+    gateway.tableRows['stock_movements'] = [pulledMovement('movement-1', 1000)];
+    final repository = SyncRepository(gateway, db);
+    await repository.pullUpdates(isOwner: true);
+
+    gateway.tableRows['stock_movements']!.add({
+      ...pulledMovement('movement-2', -400),
+      'synced_at': DateTime(2026, 10, 2).toIso8601String(),
+    });
+    await repository.pullUpdates(isOwner: true);
+
+    final lot = await (db.select(db.lots)
+          ..where((t) => t.syncId.equals('lot-1')))
+        .getSingle();
+    expect(lot.remainingQty, 600);
   });
 }

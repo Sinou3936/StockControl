@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
 import 'core/providers/auth_providers.dart';
-import 'core/providers/store_providers.dart';
 import 'core/providers/sync_providers.dart';
 import 'core/shell/app_shell.dart';
 import 'features/auth/login_screen.dart';
@@ -33,25 +32,7 @@ class _StockControlAppState extends ConsumerState<StockControlApp> {
     super.dispose();
   }
 
-  Future<void> _runSync() async {
-    final session = ref.read(authSessionProvider);
-    if (session == null) return;
-    try {
-      await ref.read(storeRepositoryProvider).refreshFromServer();
-    } catch (_) {
-      // 매장 목록을 못 받아도 로컬 데이터 동기화는 계속 진행
-    }
-    try {
-      final repository = ref.read(syncRepositoryProvider);
-      await repository.pushPending();
-      await repository.pullUpdates(
-        isOwner: session.isOwner,
-        storeId: session.storeId,
-      );
-    } catch (_) {
-      // 오프라인이거나 서버 오류 — 다음 주기에 재시도
-    }
-  }
+  void _runSync() => ref.read(syncControllerProvider.notifier).sync();
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +50,13 @@ class _StockControlAppState extends ConsumerState<StockControlApp> {
       if (next == null) {
         _syncTimer?.cancel();
       }
+    });
+
+    // 저장이 일어나 큐가 늘어나면 60초를 기다리지 않고 바로 동기화한다.
+    ref.listen(pendingSyncCountProvider, (previous, next) {
+      final before = previous?.valueOrNull ?? 0;
+      final after = next.valueOrNull ?? 0;
+      if (after > before) _runSync();
     });
 
     return MaterialApp(

@@ -29,4 +29,20 @@ void main() {
 
     expect(await db.syncQueueDao.oldest(), isNull);
   });
+
+  test('watchPendingCount emits the queue size whenever it changes',
+      () async {
+    final counts = <int>[];
+    final sub = db.syncQueueDao.watchPendingCount().listen(counts.add);
+
+    await Future<void>.delayed(Duration.zero);
+    await db.syncQueueDao.enqueue('suppliers', 1);
+    await Future<void>.delayed(Duration.zero);
+    await db.syncQueueDao.enqueue('suppliers', 2);
+    await Future<void>.delayed(Duration.zero);
+    await sub.cancel();
+
+    expect(counts.first, 0);
+    expect(counts.last, 2);
+  });
 }

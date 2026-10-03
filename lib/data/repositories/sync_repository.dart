@@ -16,10 +16,11 @@ class SyncRepository {
     'stock_movements',
   ];
 
-  Future<void> pushPending() async {
+  /// 큐를 끝까지 비우면 true, 중간에 전송이 실패해 멈추면 false.
+  Future<bool> pushPending() async {
     while (true) {
       final entry = await _db.syncQueueDao.oldest();
-      if (entry == null) return;
+      if (entry == null) return true;
 
       final payload = await _buildPayload(entry.targetTable, entry.recordId);
       if (payload == null) {
@@ -30,7 +31,7 @@ class SyncRepository {
       try {
         await _gateway.upsert(entry.targetTable, payload);
       } catch (_) {
-        return;
+        return false;
       }
       await _db.syncQueueDao.remove(entry.id);
     }
@@ -52,6 +53,12 @@ class SyncRepository {
 
       for (final row in rows) {
         await _applyPulledRow(tableName, row);
+      }
+
+      if (tableName == 'stock_movements') {
+        await _recomputeRemainingQty(
+          rows.map((r) => r['lot_id'] as String).toSet(),
+        );
       }
 
       final latest = rows
@@ -216,6 +223,23 @@ class SyncRepository {
                 syncId: Value(syncId),
               ),
             );
+    }
+  }
+
+  /// 잔량은 동기화하지 않으므로, 받은 재고이동이 닿은 로트의 잔량을
+  /// 그 로트의 모든 재고이동 합계로 다시 계산한다.
+  Future<void> _recomputeRemainingQty(Set<String> lotSyncIds) async {
+    for (final lotSyncId in lotSyncIds) {
+      final lotId = await _findLotLocalId(lotSyncId);
+      if (lotId == null) continue;
+
+      final total = _db.stockMovements.quantity.sum();
+      final result = await (_db.selectOnly(_db.stockMovements)
+            ..addColumns([total])
+            ..where(_db.stockMovements.lotId.equals(lotId)))
+          .getSingle();
+
+      await _db.lotDao.updateRemainingQty(lotId, result.read(total) ?? 0);
     }
   }
 

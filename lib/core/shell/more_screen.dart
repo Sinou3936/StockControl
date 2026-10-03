@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/ingredient_management/ingredient_list_screen.dart';
 import '../../features/supplier_management/supplier_list_screen.dart';
 import '../providers/auth_providers.dart';
+import '../providers/sync_providers.dart';
 import 'auth_add_staff_route.dart';
 import 'store_management_route.dart';
 
@@ -42,12 +43,48 @@ class MoreScreen extends ConsumerWidget {
               title: const Text('직원 추가'),
               onTap: () => pushAddStaffScreen(context),
             ),
+          _SyncTile(
+            status: ref.watch(syncControllerProvider),
+            onTap: () => ref.read(syncControllerProvider.notifier).sync(),
+          ),
           ListTile(
             title: const Text('로그아웃'),
             onTap: () => ref.read(authSessionProvider.notifier).clear(),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SyncTile extends StatelessWidget {
+  const _SyncTile({required this.status, required this.onTap});
+
+  final SyncStatus status;
+  final VoidCallback onTap;
+
+  String get _subtitle {
+    if (status.isSyncing) return '동기화 중...';
+    if (status.errorMessage != null) return status.errorMessage!;
+    final at = status.lastSyncedAt;
+    if (at == null) return '아직 동기화하지 않았습니다';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '마지막 동기화 ${two(at.hour)}:${two(at.minute)}:${two(at.second)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: const Text('지금 동기화'),
+      subtitle: Text(_subtitle),
+      trailing: status.isSyncing
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.sync),
+      onTap: status.isSyncing ? null : onTap,
     );
   }
 }

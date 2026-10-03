@@ -19,13 +19,17 @@ class FakeSyncGateway implements SyncGateway {
     _upsertCount++;
     upsertedPayloads.add(payload);
 
+    // 진짜 서버는 행이 처음 들어올 때 synced_at을 now()로 채운다.
     final rows = tableRows.putIfAbsent(tableName, () => []);
     final existingIndex =
         rows.indexWhere((r) => r['id'] == payload['id']);
     if (existingIndex >= 0) {
-      rows[existingIndex] = payload;
+      rows[existingIndex] = {
+        ...payload,
+        'synced_at': rows[existingIndex]['synced_at'],
+      };
     } else {
-      rows.add(payload);
+      rows.add({...payload, 'synced_at': DateTime.now().toIso8601String()});
     }
   }
 

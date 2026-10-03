@@ -17,6 +17,13 @@ class SyncQueueDao extends DatabaseAccessor<AppDatabase>
       (select(syncQueue)..orderBy([(t) => OrderingTerm.asc(t.id)])..limit(1))
           .getSingleOrNull();
 
+  Stream<int> watchPendingCount() {
+    final count = syncQueue.id.count();
+    return (selectOnly(syncQueue)..addColumns([count]))
+        .map((row) => row.read(count) ?? 0)
+        .watchSingle();
+  }
+
   Future<void> remove(int id) =>
       (delete(syncQueue)..where((t) => t.id.equals(id))).go();
 }
