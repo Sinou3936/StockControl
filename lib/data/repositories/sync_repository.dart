@@ -53,20 +53,27 @@ class SyncRepository {
       );
       if (rows.isEmpty) continue;
 
-      for (final row in rows) {
-        await _applyPulledRow(tableName, row);
-      }
-
-      if (tableName == 'stock_movements') {
-        await _recomputeRemainingQty(
-          rows.map((r) => r['lot_id'] as String).toSet(),
+      // 서버가 준 순서(synced_at 오름차순)대로 적용하다가, 참조 대상이 아직
+      // 로컬에 없는 행을 만나면 거기서 멈춘다. 커서를 그 행 앞에 두어 다음
+      // 동기화에서 다시 시도하므로, 건너뛴 행이 영영 사라지지 않는다.
+      final sorted = [...rows]..sort(
+          (a, b) => DateTime.parse(a['synced_at'] as String)
+              .compareTo(DateTime.parse(b['synced_at'] as String)),
         );
+      DateTime? cursorTo;
+      final touchedLots = <String>{};
+      for (final row in sorted) {
+        if (!await _applyPulledRow(tableName, row)) break;
+        cursorTo = DateTime.parse(row['synced_at'] as String);
+        if (tableName == 'stock_movements') {
+          touchedLots.add(row['lot_id'] as String);
+        }
       }
 
-      final latest = rows
-          .map((r) => DateTime.parse(r['synced_at'] as String))
-          .reduce((a, b) => a.isAfter(b) ? a : b);
-      await _db.syncCursorDao.setLastSyncedAt(tableName, latest);
+      if (touchedLots.isNotEmpty) await _recomputeRemainingQty(touchedLots);
+      if (cursorTo != null) {
+        await _db.syncCursorDao.setLastSyncedAt(tableName, cursorTo);
+      }
     }
   }
 
@@ -153,7 +160,9 @@ class SyncRepository {
     }
   }
 
-  Future<void> _applyPulledRow(
+  /// 행을 반영했거나 이미 있으면 true, 참조하는 행이 아직 로컬에 없어 지금은
+  /// 반영할 수 없으면 false.
+  Future<bool> _applyPulledRow(
     String tableName,
     Map<String, dynamic> row,
   ) async {
@@ -161,7 +170,7 @@ class SyncRepository {
 
     switch (tableName) {
       case 'suppliers':
-        if (await _findSupplierLocalId(syncId) != null) return;
+        if (await _findSupplierLocalId(syncId) != null) return true;
         await _db.into(_db.suppliers).insert(
               SuppliersCompanion.insert(
                 name: row['name'] as String,
@@ -171,7 +180,7 @@ class SyncRepository {
               ),
             );
       case 'ingredients':
-        if (await _findIngredientLocalId(syncId) != null) return;
+        if (await _findIngredientLocalId(syncId) != null) return true;
         await _db.into(_db.ingredients).insert(
               IngredientsCompanion.insert(
                 name: row['name'] as String,
@@ -187,11 +196,11 @@ class SyncRepository {
               ),
             );
       case 'lots':
-        if (await _findLotLocalId(syncId) != null) return;
+        if (await _findLotLocalId(syncId) != null) return true;
         final ingredientLocalId = await _findIngredientLocalId(
           row['ingredient_id'] as String,
         );
-        if (ingredientLocalId == null) return;
+        if (ingredientLocalId == null) return false;
         int? supplierLocalId;
         if (row['supplier_id'] != null) {
           supplierLocalId =
@@ -214,9 +223,9 @@ class SyncRepository {
               ),
             );
       case 'stock_movements':
-        if (await _findStockMovementLocalId(syncId) != null) return;
+        if (await _findStockMovementLocalId(syncId) != null) return true;
         final lotLocalId = await _findLotLocalId(row['lot_id'] as String);
-        if (lotLocalId == null) return;
+        if (lotLocalId == null) return false;
         await _db.into(_db.stockMovements).insert(
               StockMovementsCompanion.insert(
                 lotId: lotLocalId,
@@ -228,6 +237,7 @@ class SyncRepository {
               ),
             );
     }
+    return true;
   }
 
   /// 잔량은 동기화하지 않으므로, 받은 재고이동이 닿은 로트의 잔량을

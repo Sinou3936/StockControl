@@ -36,6 +36,7 @@ class SupabaseSyncGateway implements SyncGateway {
     if (storeId != null) {
       query = query.eq('store_id', storeId);
     }
-    return query;
+    // 서버는 한 번에 최대 1000행만 주므로, 오래된 것부터 받아야 커서가 안전하게 전진한다.
+    return query.order('synced_at', ascending: true);
   }
 }

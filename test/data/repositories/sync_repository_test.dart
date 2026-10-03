@@ -125,21 +125,20 @@ void main() {
     expect(remaining, isNotNull);
   });
 
-  test('pushPending re-sent to the same entry does not duplicate it '
+  test('pushPending sent twice for the same row does not duplicate it '
       '(idempotent retry)', () async {
     final gateway = FakeSyncGateway();
     final repository = SyncRepository(gateway, db);
 
-    await db.supplierDao.insertSupplier(
+    final id = await db.supplierDao.insertSupplier(
       SuppliersCompanion.insert(name: '거래처D'),
     );
-
+    // 전송은 됐는데 큐에서 지우기 전에 앱이 꺼진 상황: 같은 행이 큐에 다시 남는다.
     await repository.pushPending();
-    // 큐가 비어서 두 번째 호출은 아무것도 안 함 — 멱등성은 upsert 자체의 책임이라
-    // 여기서는 같은 payload를 가짜 게이트웨이에 직접 두 번 보내 확인한다.
-    final payload = gateway.upsertedPayloads.first;
-    await gateway.upsert('suppliers', payload);
+    await db.syncQueueDao.enqueue('suppliers', id);
+    await repository.pushPending();
 
+    expect(gateway.upsertedPayloads, hasLength(2));
     expect(gateway.tableRows['suppliers'], hasLength(1));
   });
 
@@ -329,6 +328,54 @@ void main() {
         'memo': null,
         'synced_at': DateTime(2026, 10, 1).toIso8601String(),
       };
+
+  test('pullUpdates retries a lot whose ingredient has not arrived yet '
+      'instead of skipping it forever', () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['lots'] = [pulledLot()];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    expect(await db.select(db.lots).get(), isEmpty);
+
+    gateway.tableRows['ingredients'] = [pulledIngredient()];
+    await repository.pullUpdates(isOwner: true);
+
+    final lots = await db.select(db.lots).get();
+    expect(lots, hasLength(1));
+    expect(lots.single.syncId, 'lot-1');
+  });
+
+  test('pullUpdates stops at a row it cannot apply yet and keeps the cursor '
+      'before it', () async {
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [pulledIngredient()];
+    gateway.tableRows['lots'] = [
+      {...pulledLot(), 'id': 'lot-ok'},
+      {
+        ...pulledLot(),
+        'id': 'lot-stuck',
+        'ingredient_id': 'ingredient-missing',
+        'synced_at': DateTime(2026, 10, 2).toIso8601String(),
+      },
+      {
+        ...pulledLot(),
+        'id': 'lot-after',
+        'synced_at': DateTime(2026, 10, 3).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    final syncIds = (await db.select(db.lots).get()).map((l) => l.syncId);
+    expect(syncIds, ['lot-ok']);
+    expect(
+      await db.syncCursorDao.getLastSyncedAt('lots'),
+      DateTime(2026, 10, 1),
+    );
+  });
 
   test('pullUpdates sets a pulled lot\'s remainingQty to the sum of its '
       'pulled movements', () async {
