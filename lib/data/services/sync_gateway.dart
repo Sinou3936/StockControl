@@ -9,6 +9,10 @@ abstract class SyncGateway {
   });
 }
 
+/// 서버는 시간대 표시가 없는 시각을 UTC로 해석한다. 로컬 시각을 그대로
+/// 보내면 한국에서는 9시간 어긋나므로 항상 UTC(Z)로 바꿔서 보낸다.
+String cursorToIso(DateTime since) => since.toUtc().toIso8601String();
+
 class SupabaseSyncGateway implements SyncGateway {
   SupabaseSyncGateway(this._client);
 
@@ -27,7 +31,7 @@ class SupabaseSyncGateway implements SyncGateway {
   }) async {
     var query = _client.from(tableName).select();
     if (since != null) {
-      query = query.gt('synced_at', since.toIso8601String());
+      query = query.gt('synced_at', cursorToIso(since));
     }
     if (storeId != null) {
       query = query.eq('store_id', storeId);

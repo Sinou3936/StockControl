@@ -67,6 +67,44 @@ void main() {
     expect(lotPayload.containsKey('remaining_qty'), isFalse);
   });
 
+  test('pushPending sends every timestamp as UTC with an explicit Z',
+      () async {
+    final gateway = FakeSyncGateway();
+    final repository = SyncRepository(gateway, db);
+
+    final ingredientId = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: true,
+      ),
+    );
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        receivedDate: DateTime(2026, 9, 3),
+        expiryDate: Value(DateTime(2026, 9, 10)),
+        unitCost: 15.0,
+        remainingQty: 1000,
+      ),
+    );
+
+    await repository.pushPending();
+
+    final lotPayload = gateway.upsertedPayloads
+        .firstWhere((p) => p.containsKey('ingredient_id'));
+    for (final key in ['created_at', 'received_date', 'expiry_date']) {
+      expect((lotPayload[key] as String).endsWith('Z'), isTrue, reason: key);
+    }
+    expect(
+      DateTime.parse(lotPayload['received_date'] as String)
+          .isAtSameMomentAs(DateTime(2026, 9, 3)),
+      isTrue,
+    );
+  });
+
   test('pushPending stops at the first failure and leaves later entries '
       'queued', () async {
     final gateway = FakeSyncGateway(failUpsertAfter: 1);

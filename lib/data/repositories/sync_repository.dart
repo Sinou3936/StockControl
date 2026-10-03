@@ -70,6 +70,8 @@ class SyncRepository {
     }
   }
 
+  String _utc(DateTime value) => value.toUtc().toIso8601String();
+
   Future<Map<String, dynamic>?> _buildPayload(
     String tableName,
     int recordId,
@@ -85,7 +87,7 @@ class SyncRepository {
           'name': row.name,
           'contact': row.contact,
           'memo': row.memo,
-          'created_at': row.createdAt.toIso8601String(),
+          'created_at': _utc(row.createdAt),
         };
       case 'ingredients':
         final row = await (_db.select(_db.ingredients)
@@ -101,7 +103,7 @@ class SyncRepository {
           'conversion_factor': row.conversionFactor,
           'is_expiry_tracked': row.isExpiryTracked,
           'safety_stock_qty': row.safetyStockQty,
-          'created_at': row.createdAt.toIso8601String(),
+          'created_at': _utc(row.createdAt),
         };
       case 'lots':
         final row = await (_db.select(_db.lots)
@@ -123,10 +125,10 @@ class SyncRepository {
           'ingredient_id': ingredient.syncId,
           'supplier_id': supplierSyncId,
           'store_id': row.storeId,
-          'received_date': row.receivedDate.toIso8601String(),
-          'expiry_date': row.expiryDate?.toIso8601String(),
+          'received_date': _utc(row.receivedDate),
+          'expiry_date': row.expiryDate == null ? null : _utc(row.expiryDate!),
           'unit_cost': row.unitCost,
-          'created_at': row.createdAt.toIso8601String(),
+          'created_at': _utc(row.createdAt),
         };
       case 'stock_movements':
         final row = await (_db.select(_db.stockMovements)
@@ -142,9 +144,9 @@ class SyncRepository {
           'store_id': lot.storeId,
           'type': row.type,
           'quantity': row.quantity,
-          'occurred_at': row.occurredAt.toIso8601String(),
+          'occurred_at': _utc(row.occurredAt),
           'memo': row.memo,
-          'created_at': row.createdAt.toIso8601String(),
+          'created_at': _utc(row.createdAt),
         };
       default:
         return null;
