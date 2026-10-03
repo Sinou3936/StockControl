@@ -74,11 +74,17 @@ void main() {
         ),
       );
 
+  // 마감 실사는 하단 탭(앱의 첫 화면 안)에 들어가므로 별도 화면으로 열지 않고
+  // home으로 직접 띄운다. 제출 후 화면이 닫히면 앱 전체가 사라진다.
+  Widget wrapAsTab() => UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: CountScreen()),
+      );
+
   testWidgets(
-      'shows a difference dialog and applies the correction on confirm',
-      (tester) async {
-    await tester.pumpWidget(wrap());
-    await tester.tap(find.text('open'));
+      'shows a difference dialog, applies the correction on confirm, and '
+      'stays on the screen with the field cleared', (tester) async {
+    await tester.pumpWidget(wrapAsTab());
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -93,10 +99,34 @@ void main() {
     await tester.tap(find.text('확정'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CountScreen), findsNothing);
+    expect(find.byType(CountScreen), findsOneWidget);
+    final field = tester.widget<TextFormField>(
+      find.byKey(Key('countField_$ingredientId')),
+    );
+    expect(field.controller?.text ?? '', isEmpty);
+    expect(find.text('실사가 반영되었습니다'), findsOneWidget);
 
     final lot = await db.lotDao.getById(lotId);
     expect(lot.remainingQty, 700);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('counting zero empties the stock and keeps the screen open',
+      (tester) async {
+    await tester.pumpWidget(wrapAsTab());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(Key('countField_$ingredientId')), '0');
+    await tester.tap(find.text('실사 제출'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('확정'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CountScreen), findsOneWidget);
+    final lot = await db.lotDao.getById(lotId);
+    expect(lot.remainingQty, 0);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

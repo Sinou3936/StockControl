@@ -18,6 +18,9 @@ class CountScreen extends ConsumerStatefulWidget {
 class _CountScreenState extends ConsumerState<CountScreen> {
   final Map<int, double> _enteredCounts = {};
 
+  // 제출 후 입력칸을 비우기 위해 목록의 State를 새로 만든다.
+  int _formVersion = 0;
+
   @override
   Widget build(BuildContext context) {
     final storeId = ref.watch(activeStoreIdProvider);
@@ -48,6 +51,7 @@ class _CountScreenState extends ConsumerState<CountScreen> {
           children: [
             Expanded(
               child: ListView.builder(
+                key: ValueKey(_formVersion),
                 itemCount: groups.length,
                 itemBuilder: (context, index) {
                   final group = groups[index];
@@ -156,6 +160,13 @@ class _CountScreenState extends ConsumerState<CountScreen> {
 
     await ref.read(lotRepositoryProvider).submitCountCorrections(adjustments);
 
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    setState(() {
+      _enteredCounts.clear();
+      _formVersion++;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('실사가 반영되었습니다')),
+    );
   }
 }
