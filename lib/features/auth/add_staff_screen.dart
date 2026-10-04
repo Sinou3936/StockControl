@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/auth_providers.dart';
 import '../../core/providers/store_providers.dart';
+import '../../core/widgets/app_widgets.dart';
 import '../../data/local/database.dart';
 
 class AddStaffScreen extends ConsumerStatefulWidget {
@@ -31,47 +32,69 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('직원 추가')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: CenteredContent(
+        maxWidth: 480,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            TextField(
-              key: const Key('newStaffNameField'),
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: '이름'),
-            ),
-            TextField(
-              key: const Key('newStaffPinField'),
-              controller: _pinController,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              decoration: const InputDecoration(labelText: 'PIN (6자리)'),
-            ),
-            StreamBuilder<List<Store>>(
-              stream: dao.watchAll(),
-              builder: (context, snapshot) {
-                final stores = snapshot.data ?? [];
-                return DropdownButton<Store>(
-                  key: const Key('newStaffStoreDropdown'),
-                  hint: const Text('소속 매장 선택'),
-                  value: _selectedStore,
-                  items: [
-                    for (final store in stores)
-                      DropdownMenuItem(
-                        value: store,
-                        child: Text(store.name),
-                      ),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SectionLabel('직원 정보'),
+                  TextField(
+                    key: const Key('newStaffNameField'),
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: '이름'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('newStaffPinField'),
+                    controller: _pinController,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'PIN (6자리)',
+                      counterText: '',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  StreamBuilder<List<Store>>(
+                    stream: dao.watchAll(),
+                    builder: (context, snapshot) {
+                      final stores = snapshot.data ?? [];
+                      return InputDecorator(
+                        decoration: const InputDecoration(labelText: '소속 매장'),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<Store>(
+                            key: const Key('newStaffStoreDropdown'),
+                            isExpanded: true,
+                            isDense: true,
+                            hint: const Text('소속 매장 선택'),
+                            value: _selectedStore,
+                            items: [
+                              for (final store in stores)
+                                DropdownMenuItem(
+                                  value: store,
+                                  child: Text(store.name),
+                                ),
+                            ],
+                            onChanged: (store) =>
+                                setState(() => _selectedStore = store),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  if (_errorText != null) ...[
+                    const SizedBox(height: 12),
+                    InlineError(_errorText!),
                   ],
-                  onChanged: (store) =>
-                      setState(() => _selectedStore = store),
-                );
-              },
+                ],
+              ),
             ),
-            if (_errorText != null)
-              Text(_errorText!, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             ElevatedButton(onPressed: _submit, child: const Text('추가')),
           ],
         ),
@@ -95,7 +118,9 @@ class _AddStaffScreenState extends ConsumerState<AddStaffScreen> {
     setState(() => _errorText = null);
 
     try {
-      await ref.read(authRepositoryProvider).addStaff(
+      await ref
+          .read(authRepositoryProvider)
+          .addStaff(
             displayName: name,
             pin: pin,
             ownerEmail: owner.email,

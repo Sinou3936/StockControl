@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/dao_providers.dart';
+import '../../core/widgets/app_widgets.dart';
 import '../../data/local/daos/supplier_dao.dart';
 import '../../data/local/database.dart';
 
@@ -18,17 +19,29 @@ class SupplierListScreen extends ConsumerWidget {
       body: StreamBuilder<List<Supplier>>(
         stream: dao.watchAll(),
         builder: (context, snapshot) {
-          final suppliers = snapshot.data ?? [];
-          return ListView.builder(
-            itemCount: suppliers.length,
-            itemBuilder: (context, index) {
-              final supplier = suppliers[index];
-              return ListTile(
-                title: Text(supplier.name),
-                subtitle:
-                    supplier.contact != null ? Text(supplier.contact!) : null,
-              );
-            },
+          if (!snapshot.hasData) return const SizedBox.shrink();
+          final suppliers = snapshot.data!;
+          if (suppliers.isEmpty) {
+            return const EmptyState(
+              icon: Icons.local_shipping_outlined,
+              title: '등록된 거래처가 없습니다',
+              message: '오른쪽 아래 + 버튼으로 거래처를 추가하세요',
+            );
+          }
+
+          return CenteredContent(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+              itemCount: suppliers.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final supplier = suppliers[index];
+                return AppListCard(
+                  title: supplier.name,
+                  subtitle: supplier.contact,
+                );
+              },
+            ),
           );
         },
       ),
@@ -47,18 +60,22 @@ class SupplierListScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('거래처 등록'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: '이름'),
-            ),
-            TextField(
-              controller: contactController,
-              decoration: const InputDecoration(labelText: '연락처'),
-            ),
-          ],
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: '이름'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: contactController,
+                decoration: const InputDecoration(labelText: '연락처'),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
