@@ -54,4 +54,85 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  Future<int> addIngredient(AppDatabase db, String name) =>
+      db.ingredientDao.insertIngredient(
+        IngredientsCompanion.insert(
+          name: name,
+          baseUnit: 'g',
+          purchaseUnit: '박스',
+          conversionFactor: 20000,
+          isExpiryTracked: true,
+        ),
+      );
+
+  Future<void> pumpScreen(WidgetTester tester, AppDatabase db) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: const MaterialApp(home: StockOverviewScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  Future<void> disposeScreen(WidgetTester tester) async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  }
+
+  testWidgets('shows an empty-state message when there is no stock',
+      (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await pumpScreen(tester, db);
+
+    expect(find.text('표시할 재고가 없습니다'), findsOneWidget);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('summarises item count and near-expiry lot count, and formats '
+      'quantities with thousands separators', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final onion = await addIngredient(db, '양파');
+    final carrot = await addIngredient(db, '당근');
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: onion,
+        receivedDate: DateTime.now(),
+        expiryDate: Value(DateTime.now().add(const Duration(days: 1))),
+        unitCost: 10,
+        remainingQty: 5000,
+      ),
+    );
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: carrot,
+        receivedDate: DateTime.now(),
+        expiryDate: Value(DateTime.now().add(const Duration(days: 30))),
+        unitCost: 10,
+        remainingQty: 1234.5,
+      ),
+    );
+
+    await pumpScreen(tester, db);
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('summaryItemCount'))).data,
+      '2',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('summaryNearExpiryCount'))).data,
+      '1',
+    );
+    expect(find.text('5,000g'), findsOneWidget);
+    expect(find.text('1,234.5g'), findsOneWidget);
+
+    await disposeScreen(tester);
+  });
 }
