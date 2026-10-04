@@ -8,6 +8,7 @@ import 'core/config/supabase_config.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/providers/sync_providers.dart';
 import 'core/shell/app_shell.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/login_screen.dart';
 
 Future<void> main() async {
@@ -61,6 +62,7 @@ class _StockControlAppState extends ConsumerState<StockControlApp> {
 
     return MaterialApp(
       title: '재고관리',
+      theme: AppTheme.light(),
       home: session == null ? const LoginScreen() : const AppShell(),
     );
   }

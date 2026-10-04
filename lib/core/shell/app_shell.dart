@@ -8,6 +8,7 @@ import '../../features/stock_overview/stock_overview_screen.dart';
 import '../../features/supplier_management/supplier_list_screen.dart';
 import '../providers/auth_providers.dart';
 import '../providers/sync_providers.dart';
+import '../theme/app_theme.dart';
 import 'auth_add_staff_route.dart';
 import 'more_screen.dart';
 import 'store_management_route.dart';
@@ -61,11 +62,6 @@ class _AppShellState extends ConsumerState<AppShell> {
               setState(() => _selectedIndex = index);
             },
             labelType: NavigationRailLabelType.all,
-            backgroundColor: Colors.white,
-            selectedIconTheme: const IconThemeData(color: Colors.indigo),
-            unselectedIconTheme: const IconThemeData(color: Colors.black54),
-            selectedLabelTextStyle: const TextStyle(color: Colors.indigo),
-            unselectedLabelTextStyle: const TextStyle(color: Colors.black54),
             destinations: [
               const NavigationRailDestination(
                 icon: Icon(Icons.inventory_2_outlined),
@@ -125,10 +121,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           Expanded(
             child: IndexedStack(
               index: _selectedIndex,
-              children: const [
-                ..._primaryScreens,
-                ..._desktopExtraScreens,
-              ],
+              children: const [..._primaryScreens, ..._desktopExtraScreens],
             ),
           ),
         ],
@@ -165,10 +158,10 @@ class _AppShellState extends ConsumerState<AppShell> {
             status.isSyncing
                 ? '동기화 중'
                 : hasError
-                    ? '실패'
-                    : status.lastSyncedAt == null
-                        ? '동기화'
-                        : _formatTime(status.lastSyncedAt!),
+                ? '실패'
+                : status.lastSyncedAt == null
+                ? '동기화'
+                : _formatTime(status.lastSyncedAt!),
             style: TextStyle(
               fontSize: 11,
               color: hasError ? Colors.red : Colors.black54,
@@ -187,36 +180,34 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget _buildMobile() {
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _primaryScreens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.indigo,
-        unselectedItemColor: Colors.black54,
-        onTap: (index) {
-          if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const MoreScreen()),
-            );
-            return;
-          }
-          setState(() => _selectedIndex = index);
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            label: '재고',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.input), label: '입고'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.fact_check_outlined),
-            label: '실사',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz),
-            label: '더보기',
-          ),
-        ],
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            if (index == 3) {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const MoreScreen()));
+              return;
+            }
+            setState(() => _selectedIndex = index);
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              label: '재고',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.input), label: '입고'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.fact_check_outlined),
+              label: '실사',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: '더보기'),
+          ],
+        ),
       ),
     );
   }

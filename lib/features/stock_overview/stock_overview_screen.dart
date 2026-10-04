@@ -21,67 +21,65 @@ class StockOverviewScreen extends ConsumerWidget {
     final storeId = ref.watch(activeStoreIdProvider);
     final storeDao = ref.watch(storeDaoProvider);
 
-    return Theme(
-      data: AppTheme.light(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('재고 조회'),
-          actions: const [StoreSwitcher()],
-        ),
-        body: StreamBuilder<List<Store>>(
-          stream: storeDao.watchAll(),
-          builder: (context, storeSnapshot) {
-            final storeNames = {
-              for (final s in storeSnapshot.data ?? <Store>[]) s.id: s.name,
-            };
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('재고 조회'),
+        actions: const [StoreSwitcher()],
+      ),
+      body: StreamBuilder<List<Store>>(
+        stream: storeDao.watchAll(),
+        builder: (context, storeSnapshot) {
+          final storeNames = {
+            for (final s in storeSnapshot.data ?? <Store>[]) s.id: s.name,
+          };
 
-            return StreamBuilder<List<LotWithIngredient>>(
-              stream: dao.watchAvailableLotsWithIngredient(storeId: storeId),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox.shrink();
+          return StreamBuilder<List<LotWithIngredient>>(
+            stream: dao.watchAvailableLotsWithIngredient(storeId: storeId),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox.shrink();
 
-                final now = DateTime.now();
-                final groups = groupLotsByIngredient(snapshot.data!, now: now);
-                if (groups.isEmpty) return const _EmptyState();
+              final now = DateTime.now();
+              final groups = groupLotsByIngredient(snapshot.data!, now: now);
+              if (groups.isEmpty) return const _EmptyState();
 
-                final nearExpiryLots = groups.fold<int>(
-                  0,
-                  (sum, g) =>
-                      sum +
-                      g.lots
-                          .where((l) => isNearExpiry(l.expiryDate, now: now))
-                          .length,
-                );
+              final nearExpiryLots = groups.fold<int>(
+                0,
+                (sum, g) =>
+                    sum +
+                    g.lots
+                        .where((l) => isNearExpiry(l.expiryDate, now: now))
+                        .length,
+              );
 
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints:
-                        const BoxConstraints(maxWidth: _kContentMaxWidth),
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _SummaryStrip(
-                          itemCount: groups.length,
-                          nearExpiryCount: nearExpiryLots,
-                        ),
-                        const SizedBox(height: 16),
-                        for (final group in groups) ...[
-                          _IngredientCard(
-                            group: group,
-                            storeNames: storeNames,
-                            now: now,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                    ),
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: _kContentMaxWidth,
                   ),
-                );
-              },
-            );
-          },
-        ),
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _SummaryStrip(
+                        itemCount: groups.length,
+                        nearExpiryCount: nearExpiryLots,
+                      ),
+                      const SizedBox(height: 16),
+                      for (final group in groups) ...[
+                        _IngredientCard(
+                          group: group,
+                          storeNames: storeNames,
+                          now: now,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -212,10 +210,7 @@ class _StatTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Text(
-                unit,
-                style: TextStyle(fontSize: 13, color: color),
-              ),
+              Text(unit, style: TextStyle(fontSize: 13, color: color)),
             ],
           ),
         ],
@@ -318,10 +313,8 @@ class _LotRow extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => StockAdjustmentFormScreen(
-              lot: lot,
-              ingredient: ingredient,
-            ),
+            builder: (_) =>
+                StockAdjustmentFormScreen(lot: lot, ingredient: ingredient),
           ),
         ),
         child: Padding(
