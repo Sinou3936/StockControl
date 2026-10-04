@@ -5,6 +5,7 @@ import '../../core/format/quantity_format.dart';
 import '../../core/providers/dao_providers.dart';
 import '../../core/providers/store_providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_widgets.dart';
 import '../../data/local/database.dart';
 import '../../domain/stock_overview.dart';
 import '../stock/store_switcher.dart';
@@ -40,7 +41,13 @@ class StockOverviewScreen extends ConsumerWidget {
 
               final now = DateTime.now();
               final groups = groupLotsByIngredient(snapshot.data!, now: now);
-              if (groups.isEmpty) return const _EmptyState();
+              if (groups.isEmpty) {
+                return const EmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title: '표시할 재고가 없습니다',
+                  message: '입고를 등록하면 여기에 나타납니다',
+                );
+              }
 
               final nearExpiryLots = groups.fold<int>(
                 0,
@@ -51,72 +58,30 @@ class StockOverviewScreen extends ConsumerWidget {
                         .length,
               );
 
-              return Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: _kContentMaxWidth,
-                  ),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _SummaryStrip(
-                        itemCount: groups.length,
-                        nearExpiryCount: nearExpiryLots,
+              return CenteredContent(
+                maxWidth: _kContentMaxWidth,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _SummaryStrip(
+                      itemCount: groups.length,
+                      nearExpiryCount: nearExpiryLots,
+                    ),
+                    const SizedBox(height: 16),
+                    for (final group in groups) ...[
+                      _IngredientCard(
+                        group: group,
+                        storeNames: storeNames,
+                        now: now,
                       ),
-                      const SizedBox(height: 16),
-                      for (final group in groups) ...[
-                        _IngredientCard(
-                          group: group,
-                          storeNames: storeNames,
-                          now: now,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
+                      const SizedBox(height: 12),
                     ],
-                  ),
+                  ],
                 ),
               );
             },
           );
         },
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 48,
-              color: AppColors.textMuted,
-            ),
-            SizedBox(height: 12),
-            Text(
-              '표시할 재고가 없습니다',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textStrong,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              '입고를 등록하면 여기에 나타납니다',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-            ),
-          ],
-        ),
       ),
     );
   }
