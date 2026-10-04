@@ -172,6 +172,40 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   });
 
+  testWidgets(
+      'shrinking the window while a desktop-only tab is selected falls back '
+      'to a valid tab instead of crashing', (tester) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(wrap());
+    await tester.pump();
+
+    await tester.tap(find.text('품목 관리'));
+    await tester.pump();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 4);
+
+    tester.view.physicalSize = const Size(390, 800);
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 0);
+
+    tester.view.physicalSize = const Size(1000, 800);
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 4);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
   testWidgets('desktop sidebar sync button runs a sync', (tester) async {
     late FakeSyncController fake;
     final container = ProviderContainer(

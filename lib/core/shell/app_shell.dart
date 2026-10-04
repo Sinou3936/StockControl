@@ -178,14 +178,18 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _buildMobile() {
+    // 넓은 화면에서 고른 거래처/품목 탭은 폰 레이아웃에 없다. 창을 줄였을 때는
+    // 재고 탭으로 보여주고, 선택 상태 자체는 그대로 두어 다시 키우면 돌아온다.
+    final index = _selectedIndex < _primaryScreens.length ? _selectedIndex : 0;
+
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _primaryScreens),
+      body: IndexedStack(index: index, children: _primaryScreens),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
+          currentIndex: index,
           onTap: (index) {
             if (index == 3) {
               Navigator.of(
