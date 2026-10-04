@@ -94,4 +94,52 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  testWidgets(
+      'does not crash when an owner already has a store selected and the '
+      'switcher is built again before the store list has loaded',
+      (tester) async {
+    await db.storeDao.upsertStore(
+      StoresCompanion.insert(id: 'store-1', name: '울산점'),
+    );
+
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-owner',
+            email: 'owner@internal.local',
+            pin: '123456',
+            displayName: '사장님',
+            role: 'owner',
+          ),
+        );
+    container.read(selectedStoreProvider.notifier).state =
+        const Store(id: 'store-1', name: '울산점');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: Scaffold(body: StoreSwitcher())),
+      ),
+    );
+
+    // 매장 목록이 아직 도착하기 전의 첫 프레임.
+    expect(tester.takeException(), isNull);
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    final dropdown = tester.widget<DropdownButton<Store?>>(
+      find.byKey(const Key('storeSwitcherDropdown')),
+    );
+    expect(dropdown.value?.id, 'store-1');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
 }
