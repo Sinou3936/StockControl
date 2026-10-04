@@ -11,7 +11,11 @@ import '../../domain/stock_overview.dart';
 import '../stock/store_switcher.dart';
 import '../stock_adjustment/stock_adjustment_form_screen.dart';
 
-const _kContentMaxWidth = 760.0;
+const _kContentMaxWidth = 1100.0;
+const _kPagePadding = 16.0;
+const _kGap = 12.0;
+const _kMinCardWidth = 220.0;
+const _kMaxColumns = 4;
 
 class StockOverviewScreen extends ConsumerWidget {
   const StockOverviewScreen({super.key});
@@ -60,23 +64,50 @@ class StockOverviewScreen extends ConsumerWidget {
 
               return CenteredContent(
                 maxWidth: _kContentMaxWidth,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _SummaryStrip(
-                      itemCount: groups.length,
-                      nearExpiryCount: nearExpiryLots,
-                    ),
-                    const SizedBox(height: 16),
-                    for (final group in groups) ...[
-                      _IngredientCard(
-                        group: group,
-                        storeNames: storeNames,
-                        now: now,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = _columnsFor(constraints.maxWidth);
+                    final rowCount = (groups.length / columns).ceil();
+
+                    // 카드 줄 단위로 만들어 화면에 보이는 줄만 그린다.
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(_kPagePadding),
+                      itemCount: rowCount + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: _kGap),
+                            child: _SummaryStrip(
+                              itemCount: groups.length,
+                              nearExpiryCount: nearExpiryLots,
+                            ),
+                          );
+                        }
+
+                        final start = (index - 1) * columns;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: _kGap),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (var i = 0; i < columns; i++) ...[
+                                if (i > 0) const SizedBox(width: _kGap),
+                                Expanded(
+                                  child: start + i < groups.length
+                                      ? _IngredientCard(
+                                          group: groups[start + i],
+                                          storeNames: storeNames,
+                                          now: now,
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               );
             },
@@ -84,6 +115,13 @@ class StockOverviewScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// 카드가 [_kMinCardWidth]보다 좁아지지 않는 선에서 한 줄에 최대한 많이.
+  int _columnsFor(double maxWidth) {
+    final available = maxWidth - _kPagePadding * 2;
+    final fit = ((available + _kGap) / (_kMinCardWidth + _kGap)).floor();
+    return fit.clamp(1, _kMaxColumns);
   }
 }
 
@@ -105,7 +143,7 @@ class _SummaryStrip extends StatelessWidget {
             valueKey: const Key('summaryItemCount'),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: _kGap),
         Expanded(
           child: _StatTile(
             label: '유통기한 임박',
@@ -140,7 +178,7 @@ class _StatTile extends StatelessWidget {
     final color = alert ? AppColors.danger : AppColors.textStrong;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: alert ? AppColors.dangerBackground : AppColors.surface,
         border: Border.all(
@@ -148,36 +186,30 @@ class _StatTile extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: alert ? AppColors.danger : AppColors.textMuted,
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: alert ? AppColors.danger : AppColors.textMuted,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                key: valueKey,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                  fontFeatures: AppTheme.tabularFigures,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(unit, style: TextStyle(fontSize: 13, color: color)),
-            ],
+          Text(
+            value,
+            key: valueKey,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: color,
+              fontFeatures: AppTheme.tabularFigures,
+            ),
           ),
+          const SizedBox(width: 4),
+          Text(unit, style: TextStyle(fontSize: 13, color: color)),
         ],
       ),
     );
@@ -200,6 +232,7 @@ class _IngredientCard extends StatelessWidget {
     final alert = group.hasNearExpiryLot;
 
     return Container(
+      key: Key('ingredientCard_${group.ingredient.id}'),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -212,24 +245,27 @@ class _IngredientCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     group.ingredient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textStrong,
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '${formatQty(group.totalRemainingQty)}'
                   '${group.ingredient.baseUnit}',
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textStrong,
                     fontFeatures: AppTheme.tabularFigures,
@@ -283,38 +319,48 @@ class _LotRow extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (storeName != null) ...[
-                _StoreChip(name: storeName!),
-                const SizedBox(width: 10),
-              ],
               Expanded(
-                child: Text(
-                  expiryText,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: lot.expiryDate == null
-                        ? AppColors.textMuted
-                        : AppColors.textBody,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expiryText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: lot.expiryDate == null
+                            ? AppColors.textMuted
+                            : AppColors.textBody,
+                      ),
+                    ),
+                    if (storeName != null || near) ...[
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (storeName != null) _StoreChip(name: storeName!),
+                          if (near) const _NearExpiryBadge(),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (near) ...[
-                const _NearExpiryBadge(),
-                const SizedBox(width: 12),
-              ],
+              const SizedBox(width: 8),
               Text(
                 formatQty(lot.remainingQty),
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textStrong,
                   fontFeatures: AppTheme.tabularFigures,
                 ),
               ),
-              const SizedBox(width: 4),
               const Icon(
                 Icons.chevron_right,
                 size: 18,
@@ -336,7 +382,7 @@ class _StoreChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.chipBackground,
         borderRadius: BorderRadius.circular(6),
@@ -344,7 +390,7 @@ class _StoreChip extends StatelessWidget {
       child: Text(
         name,
         style: const TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
           color: AppColors.textBody,
         ),
@@ -359,7 +405,7 @@ class _NearExpiryBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border.all(color: AppColors.dangerBorder),
@@ -368,12 +414,12 @@ class _NearExpiryBadge extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.schedule, size: 12, color: AppColors.danger),
-          SizedBox(width: 4),
+          Icon(Icons.schedule, size: 11, color: AppColors.danger),
+          SizedBox(width: 3),
           Text(
             '임박',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: AppColors.danger,
             ),

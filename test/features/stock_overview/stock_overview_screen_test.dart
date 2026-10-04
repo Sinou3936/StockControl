@@ -9,8 +9,9 @@ import 'package:stockcontrol/features/stock_adjustment/stock_adjustment_form_scr
 import 'package:stockcontrol/features/stock_overview/stock_overview_screen.dart';
 
 void main() {
-  testWidgets('shows ingredient groups and flags near-expiry lots',
-      (tester) async {
+  testWidgets('shows ingredient groups and flags near-expiry lots', (
+    tester,
+  ) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -82,14 +83,77 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
-  testWidgets('shows an empty-state message when there is no stock',
-      (tester) async {
+  testWidgets('shows an empty-state message when there is no stock', (
+    tester,
+  ) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
     await pumpScreen(tester, db);
 
     expect(find.text('표시할 재고가 없습니다'), findsOneWidget);
+
+    await disposeScreen(tester);
+  });
+
+  Future<AppDatabase> dbWithIngredients(int count) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    for (var i = 1; i <= count; i++) {
+      final id = await addIngredient(db, '품목$i');
+      await db.lotDao.insertLot(
+        LotsCompanion.insert(
+          ingredientId: id,
+          receivedDate: DateTime.now(),
+          unitCost: 10,
+          remainingQty: 100.0 * i,
+        ),
+      );
+    }
+    return db;
+  }
+
+  Future<void> setWidth(WidgetTester tester, double width) async {
+    tester.view.physicalSize = Size(width, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  }
+
+  Offset cardTopLeft(WidgetTester tester, int ingredientNumber) =>
+      tester.getTopLeft(find.byKey(Key('ingredientCard_$ingredientNumber')));
+
+  testWidgets('lays ingredient cards out three per row at the default '
+      'desktop width', (tester) async {
+    final db = await dbWithIngredients(4);
+    await setWidth(tester, 800);
+
+    await pumpScreen(tester, db);
+
+    final first = cardTopLeft(tester, 1);
+    final second = cardTopLeft(tester, 2);
+    final third = cardTopLeft(tester, 3);
+    final fourth = cardTopLeft(tester, 4);
+    expect(second.dy, first.dy);
+    expect(third.dy, first.dy);
+    expect(second.dx, greaterThan(first.dx));
+    expect(third.dx, greaterThan(second.dx));
+    expect(fourth.dy, greaterThan(first.dy));
+    expect(fourth.dx, first.dx);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('falls back to one card per row at phone width', (tester) async {
+    final db = await dbWithIngredients(3);
+    await setWidth(tester, 390);
+
+    await pumpScreen(tester, db);
+
+    final first = cardTopLeft(tester, 1);
+    final second = cardTopLeft(tester, 2);
+    expect(second.dx, first.dx);
+    expect(second.dy, greaterThan(first.dy));
 
     await disposeScreen(tester);
   });
