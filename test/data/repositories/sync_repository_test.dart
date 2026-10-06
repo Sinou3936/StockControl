@@ -419,4 +419,83 @@ void main() {
         .getSingle();
     expect(lot.remainingQty, 600);
   });
+
+  test('pullUpdates updates safetyStockQty on an ingredient that already '
+      'exists locally, leaving its other fields alone', () async {
+    final localId = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+      ),
+    );
+    final local = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == localId);
+
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [
+      {
+        'id': local.syncId,
+        'name': '서버에서온이름',
+        'category': null,
+        'base_unit': 'kg',
+        'purchase_unit': '자루',
+        'conversion_factor': 999,
+        'is_expiry_tracked': true,
+        'safety_stock_qty': 5000,
+        'synced_at': DateTime(2026, 10, 6).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    final updated = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == localId);
+    expect(updated.safetyStockQty, 5000);
+    expect(updated.name, '양파');
+    expect(updated.baseUnit, 'g');
+    expect(updated.purchaseUnit, '박스');
+    expect(updated.conversionFactor, 20000);
+    expect(updated.isExpiryTracked, isFalse);
+  });
+
+  test('pullUpdates can clear safetyStockQty back to null', () async {
+    final localId = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+        safetyStockQty: const Value(5000),
+      ),
+    );
+    final local = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == localId);
+
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [
+      {
+        'id': local.syncId,
+        'name': '양파',
+        'category': null,
+        'base_unit': 'g',
+        'purchase_unit': '박스',
+        'conversion_factor': 20000,
+        'is_expiry_tracked': false,
+        'safety_stock_qty': null,
+        'synced_at': DateTime(2026, 10, 6).toIso8601String(),
+      },
+    ];
+    final repository = SyncRepository(gateway, db);
+
+    await repository.pullUpdates(isOwner: true);
+
+    final updated = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == localId);
+    expect(updated.safetyStockQty, isNull);
+  });
 }

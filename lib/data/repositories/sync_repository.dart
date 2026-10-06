@@ -180,7 +180,21 @@ class SyncRepository {
               ),
             );
       case 'ingredients':
-        if (await _findIngredientLocalId(syncId) != null) return true;
+        final existingIngredientId = await _findIngredientLocalId(syncId);
+        if (existingIngredientId != null) {
+          // 품목에서 값이 바뀔 수 있는 필드는 안전재고 하나뿐이다. 이름·단위·
+          // 환산계수를 덮어쓰면 과거 로트와 어긋나므로 건드리지 않는다.
+          await (_db.update(_db.ingredients)
+                ..where((t) => t.id.equals(existingIngredientId)))
+              .write(
+            IngredientsCompanion(
+              safetyStockQty: Value(
+                (row['safety_stock_qty'] as num?)?.toDouble(),
+              ),
+            ),
+          );
+          return true;
+        }
         await _db.into(_db.ingredients).insert(
               IngredientsCompanion.insert(
                 name: row['name'] as String,
