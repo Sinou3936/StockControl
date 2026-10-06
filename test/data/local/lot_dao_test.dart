@@ -135,4 +135,49 @@ void main() {
     expect(queued!.targetTable, 'lots');
     expect(queued.recordId, lotId);
   });
+
+  test('watchStockLevelsByStore sums lots per ingredient and store', () async {
+    await db.storeDao.upsertStore(
+      StoresCompanion.insert(id: 'store-1', name: '울산점'),
+    );
+    await db.storeDao.upsertStore(
+      StoresCompanion.insert(id: 'store-2', name: '부산점'),
+    );
+
+    for (final (store, qty) in [('store-1', 300.0), ('store-1', 200.0),
+        ('store-2', 50.0)]) {
+      await db.lotDao.insertLot(
+        LotsCompanion.insert(
+          ingredientId: ingredientId,
+          storeId: Value(store),
+          receivedDate: DateTime(2026, 10, 1),
+          unitCost: 10,
+          remainingQty: qty,
+        ),
+      );
+    }
+
+    final levels = await db.lotDao.watchStockLevelsByStore().first;
+
+    final ulsan = levels.firstWhere((l) => l.storeId == 'store-1');
+    final busan = levels.firstWhere((l) => l.storeId == 'store-2');
+    expect(ulsan.totalQty, 500);
+    expect(ulsan.ingredientId, ingredientId);
+    expect(busan.totalQty, 50);
+  });
+
+  test('watchStockLevelsByStore ignores lots that have no store', () async {
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        receivedDate: DateTime(2026, 10, 1),
+        unitCost: 10,
+        remainingQty: 999,
+      ),
+    );
+
+    final levels = await db.lotDao.watchStockLevelsByStore().first;
+
+    expect(levels, isEmpty);
+  });
 }

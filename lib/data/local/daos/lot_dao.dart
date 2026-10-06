@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../domain/stock_overview.dart';
+import '../../../domain/stock_shortage.dart';
 import '../../../domain/sync_id.dart';
 import '../database.dart';
 import '../tables/lots_table.dart';
@@ -52,6 +53,27 @@ class LotDao extends DatabaseAccessor<AppDatabase> with _$LotDaoMixin {
                 (row) => LotWithIngredient(
                   lot: row.readTable(lots),
                   ingredient: row.readTable(ingredients),
+                ),
+              )
+              .toList(),
+        );
+  }
+
+  /// 매장별·품목별 남은 수량 합계. 매장이 지정되지 않은 로트는 제외한다.
+  Stream<List<StoreStockLevel>> watchStockLevelsByStore() {
+    final total = lots.remainingQty.sum();
+    final query = selectOnly(lots)
+      ..addColumns([lots.ingredientId, lots.storeId, total])
+      ..where(lots.storeId.isNotNull())
+      ..groupBy([lots.ingredientId, lots.storeId]);
+
+    return query.watch().map(
+          (rows) => rows
+              .map(
+                (row) => StoreStockLevel(
+                  ingredientId: row.read(lots.ingredientId)!,
+                  storeId: row.read(lots.storeId)!,
+                  totalQty: row.read(total) ?? 0,
                 ),
               )
               .toList(),
