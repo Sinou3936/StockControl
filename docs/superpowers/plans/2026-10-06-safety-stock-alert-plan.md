@@ -18,7 +18,7 @@
 - `storeId`가 `null`인 로트는 매장별 합계에서 제외한다.
 - 직원은 자기 매장 것만 본다. 세션에 매장이 없으면 빈 목록이다 — 전 매장으로 넘어가면 안 된다.
 - 품목의 이름·단위·환산계수는 이번 범위에서 수정하지 않는다. 수정 대상은 안전재고 값뿐이다.
-- `calculateShortages`는 Drift·Riverpod·Flutter를 import하지 않는다. 입력은 평범한 리스트, 출력은 평범한 리스트다.
+- `calculateShortages`는 계산만 한다 — DB 조회, Riverpod, Flutter 위젯을 쓰지 않는다. Drift가 생성한 행 타입(`Ingredient`, `Store`)을 `database.dart`에서 import하는 것은 허용한다. 기존 도메인 파일(`stock_overview.dart`, `stock_count.dart`)이 모두 그렇게 돼 있다. 입력과 출력은 평범한 리스트다.
 - 테스트에서 `package:drift/drift.dart`를 import하면서 `isNull`/`isNotNull` matcher를 쓸 때는 `hide isNotNull, isNull`을 붙인다 (이름 충돌).
 - `testWidgets` 안에서 `await dao.watchAll().first`처럼 실제 스트림을 직접 기다리면 멈춘다. `tester.pump()`로 흘려보낸다.
 - 커밋 메시지 끝에 `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`를 붙인다.
