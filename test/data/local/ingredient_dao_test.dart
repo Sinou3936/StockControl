@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/data/local/database.dart';
@@ -61,5 +62,48 @@ void main() {
     final queued = await db.syncQueueDao.oldest();
     expect(queued!.targetTable, 'ingredients');
     expect(queued.recordId, id);
+  });
+
+  test('updateSafetyStock writes the value and queues the row for sync',
+      () async {
+    final id = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+      ),
+    );
+    await db.delete(db.syncQueue).go();
+
+    await db.ingredientDao.updateSafetyStock(id, 5000);
+
+    final saved = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == id);
+    expect(saved.safetyStockQty, 5000);
+
+    final queued = await db.syncQueueDao.oldest();
+    expect(queued!.targetTable, 'ingredients');
+    expect(queued.recordId, id);
+  });
+
+  test('updateSafetyStock with null clears tracking', () async {
+    final id = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+        safetyStockQty: const Value(5000),
+      ),
+    );
+
+    await db.ingredientDao.updateSafetyStock(id, null);
+
+    final saved = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == id);
+    expect(saved.safetyStockQty, isNull);
   });
 }
