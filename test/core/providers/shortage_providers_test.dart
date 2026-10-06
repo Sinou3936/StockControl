@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/core/providers/shortage_providers.dart';
 import 'package:stockcontrol/core/providers/store_providers.dart';
 import 'package:stockcontrol/data/local/database.dart';
+import 'package:stockcontrol/domain/stock_shortage.dart';
 
 void main() {
   late AppDatabase db;
@@ -140,5 +143,24 @@ void main() {
 
     expect(shortages, hasLength(1));
     expect(shortages.single.store.id, 'store-2');
+  });
+
+  test('한 스트림이 로딩 중이면 빈 목록을 반환한다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        stockLevelsStreamProvider.overrideWith(
+          (_) =>
+              Stream.fromFuture(Completer<List<StoreStockLevel>>().future),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(owner());
+    await settle(container);
+
+    final shortages = container.read(shortagesProvider);
+
+    expect(shortages, isEmpty);
   });
 }

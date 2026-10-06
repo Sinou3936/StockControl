@@ -27,10 +27,19 @@ final shortagesProvider = Provider<List<StockShortage>>((ref) {
   final session = ref.watch(authSessionProvider);
   if (session == null) return const [];
 
-  final allStores = ref.watch(storesStreamProvider).valueOrNull ?? const [];
-  final ingredients =
-      ref.watch(ingredientsStreamProvider).valueOrNull ?? const [];
-  final levels = ref.watch(stockLevelsStreamProvider).valueOrNull ?? const [];
+  final storesAsync = ref.watch(storesStreamProvider);
+  final ingredientsAsync = ref.watch(ingredientsStreamProvider);
+  final levelsAsync = ref.watch(stockLevelsStreamProvider);
+
+  if (!storesAsync.hasValue ||
+      !ingredientsAsync.hasValue ||
+      !levelsAsync.hasValue) {
+    return const [];
+  }
+
+  final allStores = storesAsync.requireValue;
+  final ingredients = ingredientsAsync.requireValue;
+  final levels = levelsAsync.requireValue;
 
   final List<Store> stores;
   if (session.isOwner) {
