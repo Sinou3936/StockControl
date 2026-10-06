@@ -407,7 +407,7 @@ import '../../../domain/stock_shortage.dart';
 - [ ] **Step 4: 테스트 실행하여 통과 확인**
 
 Run: `flutter test test/data/local/lot_dao_test.dart`
-Expected: PASS (기존 6개 + 신규 2개)
+Expected: PASS (기존 5개 + 신규 2개 = 7개)
 
 - [ ] **Step 5: Commit**
 
@@ -660,7 +660,7 @@ Expected: FAIL — 첫 테스트가 `Expected: 5000 Actual: <null>` (지금은 �
 - [ ] **Step 4: 테스트 실행하여 통과 확인**
 
 Run: `flutter test test/data/repositories/sync_repository_test.dart`
-Expected: PASS (기존 13개 + 신규 2개)
+Expected: PASS (기존 14개 + 신규 2개 = 16개)
 
 - [ ] **Step 5: 전체 테스트로 회귀 확인**
 
