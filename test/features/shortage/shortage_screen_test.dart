@@ -399,6 +399,30 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('매장 이름이 바뀐 뒤에 열면 발주서에 바뀐 이름이 찍힌다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+    // selectedStoreProvider에는 옛 이름의 울산점 객체가 그대로 남는다.
+    await pumpOwnerWithStore(tester);
+
+    // 사장이 매장을 고른 뒤에 동기화로 새 이름을 받은 상황.
+    await db.storeDao.upsertStore(
+      StoresCompanion.insert(id: 'store-1', name: '울산본점'),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    await tester.tap(find.byKey(const Key('purchaseOrderButton')));
+    await tester.pumpAndSettle();
+
+    final screen = tester.widget<PurchaseOrderScreen>(
+      find.byType(PurchaseOrderScreen),
+    );
+    expect(screen.store.id, 'store-1');
+    expect(screen.store.name, '울산본점');
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('발주서 화면에서 돌아오면 발주서 만들기 버튼이 다시 눌린다', (tester) async {
     await addTrackedIngredient('양파', 5000);
     await pumpOwnerWithStore(tester);

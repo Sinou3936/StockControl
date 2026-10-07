@@ -321,11 +321,17 @@ class _PurchaseOrderBarState extends ConsumerState<_PurchaseOrderBar> {
     _opening = true;
     // 누르는 동안 버튼도 비활성으로 보이게 한다.
     setState(() {});
+    // 선택해 둔 Store 객체는 고른 뒤에 매장 이름이 바뀌어도 옛 값이다. 발주서의
+    // 매장 이름과 파일 이름에 옛 이름이 찍히지 않도록 최신 행을 id로 다시
+    // 찾는다. 찾지 못하면 붙잡고 있던 객체를 쓴다.
+    final latest = ref
+        .read(shortageStoresProvider)
+        .firstWhere((s) => s.id == store.id, orElse: () => store);
     try {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => PurchaseOrderScreen(
-            store: store,
+            store: latest,
             shortages: [
               for (final shortage in widget.shortages)
                 if (shortage.store.id == store.id) shortage,
