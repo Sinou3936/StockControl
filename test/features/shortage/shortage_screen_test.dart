@@ -136,6 +136,20 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('판정할 매장이 없으면 기준 이상이라고 말하지 않는다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+
+    // 세션의 매장이 로컬 매장 목록에 없는 상태 — 매장 정보를 아직 받지 못한
+    // 기기에서 일어난다. 판정이 한 건도 되지 않았으므로 "기준 이상"이라고
+    // 안내하면 재고가 충분하다는 뜻으로 읽힌다.
+    await pumpScreen(tester, staff(storeId: 'store-없는곳'));
+
+    expect(find.text('판정할 매장이 없습니다'), findsOneWidget);
+    expect(find.text('모든 품목이 기준 이상입니다'), findsNothing);
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('추적 중인데 전부 기준 이상이면 충분하다는 안내가 보인다',
       (tester) async {
     final id = await addTrackedIngredient('양파', 100);
@@ -194,6 +208,13 @@ void main() {
       find.byType(InboundFormScreen),
     );
     expect(form.initialIngredient?.id, id);
+
+    // 넘긴 것으로 끝이 아니라, 입고 폼이 그 품목을 실제로 골라 둔 상태여야
+    // 한다. 이걸 보지 않으면 폼이 받은 값을 무시해도 테스트가 통과한다.
+    final dropdown = tester.widget<DropdownButtonFormField<Ingredient>>(
+      find.byKey(const Key('ingredientDropdown')),
+    );
+    expect(dropdown.initialValue?.id, id);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
