@@ -163,4 +163,147 @@ void main() {
 
     await disposeScreen(tester);
   });
+
+  const safetyStockError = '숫자로 입력해 주세요 (예: 5000). 비우면 알림에서 제외됩니다.';
+
+  Future<double?> savedSafety(int id) async =>
+      (await db.select(db.ingredients).get())
+          .firstWhere((i) => i.id == id)
+          .safetyStockQty;
+
+  Future<void> openSafetyStockDialog(WidgetTester tester) async {
+    await pumpScreen(tester);
+    await tester.tap(find.text('양파'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openAddDialogAndFill(
+    WidgetTester tester, {
+    required String safety,
+  }) async {
+    await pumpScreen(tester);
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, '품목명'), '당근');
+    await tester.enterText(
+      find.widgetWithText(TextField, '구매 단위 (예: 박스)'),
+      '자루',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '구매단위 1개 = base unit 몇 개'),
+      '10000',
+    );
+    await tester.enterText(
+      find.byKey(const Key('newSafetyStockField')),
+      safety,
+    );
+  }
+
+  testWidgets('수정 다이얼로그에 천 단위 콤마가 든 5,000을 넣으면 5000으로 저장된다', (tester) async {
+    final id = await addIngredient();
+
+    await openSafetyStockDialog(tester);
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '5,000');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(await savedSafety(id), 5000);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('수정 다이얼로그에 5000g를 넣으면 오류를 보이고 저장하지 않는다', (tester) async {
+    final id = await addIngredient(safety: 5000);
+
+    await openSafetyStockDialog(tester);
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '5000g');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(safetyStockError), findsOneWidget);
+    expect(find.byKey(const Key('safetyStockField')), findsOneWidget);
+    expect(await savedSafety(id), 5000);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('오류가 뜬 뒤 값을 고치면 오류가 사라지고 저장된다', (tester) async {
+    final id = await addIngredient(safety: 3000);
+
+    await openSafetyStockDialog(tester);
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '5000g');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+    expect(find.text(safetyStockError), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '5000');
+    await tester.pump();
+    expect(find.text(safetyStockError), findsNothing);
+
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('safetyStockField')), findsNothing);
+    expect(await savedSafety(id), 5000);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('소수 안전재고는 반올림 없이 채워지고 그대로 저장해도 값이 같다', (tester) async {
+    final id = await addIngredient(safety: 12.345);
+
+    await openSafetyStockDialog(tester);
+
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('safetyStockField')),
+    );
+    expect(field.controller!.text, '12.345');
+
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(await savedSafety(id), 12.345);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('신규 등록에서 안전재고에 abc를 넣으면 오류를 보이고 품목을 만들지 않는다', (tester) async {
+    await openAddDialogAndFill(tester, safety: 'abc');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(safetyStockError), findsOneWidget);
+    expect(find.byKey(const Key('newSafetyStockField')), findsOneWidget);
+    expect(await db.select(db.ingredients).get(), isEmpty);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('신규 등록에서 안전재고 2,500을 넣으면 2500으로 만들어진다', (tester) async {
+    await openAddDialogAndFill(tester, safety: '2,500');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    final saved = (await db.select(db.ingredients).get()).firstWhere(
+      (i) => i.name == '당근',
+    );
+    expect(saved.safetyStockQty, 2500);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('신규 등록의 안전재고 칸에 기본 단위가 보인다', (tester) async {
+    await openAddDialogAndFill(tester, safety: '');
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('newSafetyStockField')),
+        matching: find.text('g'),
+      ),
+      findsOneWidget,
+    );
+
+    await disposeScreen(tester);
+  });
 }

@@ -9,6 +9,11 @@ import '../../core/widgets/app_widgets.dart';
 import '../../data/local/daos/ingredient_dao.dart';
 import '../../data/local/database.dart';
 import '../../domain/base_unit.dart';
+import '../../domain/safety_stock_input.dart';
+
+/// 안전재고 칸을 읽을 수 없을 때 보여 주는 문구. null로 저장하면 알림이
+/// 말없이 꺼지므로, 읽을 수 없는 입력은 저장하지 않고 이 문구를 보여 준다.
+const _safetyStockErrorMessage = '숫자로 입력해 주세요 (예: 5000). 비우면 알림에서 제외됩니다.';
 
 class IngredientListScreen extends ConsumerWidget {
   const IngredientListScreen({super.key});
@@ -81,56 +86,64 @@ class IngredientListScreen extends ConsumerWidget {
     final controller = TextEditingController(
       text: ingredient.safetyStockQty == null
           ? ''
-          : formatQty(ingredient.safetyStockQty!).replaceAll(',', ''),
+          : safetyStockInputText(ingredient.safetyStockQty!),
     );
+    String? error;
 
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${ingredient.name} 안전재고'),
-        content: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                key: const Key('safetyStockField'),
-                controller: controller,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('${ingredient.name} 안전재고'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  key: const Key('safetyStockField'),
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: '안전재고',
+                    suffixText: ingredient.baseUnit,
+                    errorText: error,
+                  ),
+                  onChanged: (_) {
+                    if (error != null) setState(() => error = null);
+                  },
                 ),
-                decoration: InputDecoration(
-                  labelText: '안전재고',
-                  suffixText: ingredient.baseUnit,
+                const SizedBox(height: 8),
+                const Text(
+                  '비워 두면 이 품목은 부족 알림에서 제외됩니다.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '비워 두면 이 품목은 부족 알림에서 제외됩니다.',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final parsed = parseSafetyStockInput(controller.text);
+                if (!parsed.isValid) {
+                  setState(() => error = _safetyStockErrorMessage);
+                  return;
+                }
+                await dao.updateSafetyStock(ingredient.id, parsed.value);
+                if (context.mounted) Navigator.of(context).pop();
+              },
+              child: const Text('저장'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final parsed = double.tryParse(controller.text.trim());
-              await dao.updateSafetyStock(
-                ingredient.id,
-                parsed == null || parsed <= 0 ? null : parsed,
-              );
-              if (context.mounted) Navigator.of(context).pop();
-            },
-            child: const Text('저장'),
-          ),
-        ],
       ),
     );
   }
@@ -142,6 +155,7 @@ class IngredientListScreen extends ConsumerWidget {
     final safetyStockController = TextEditingController();
     BaseUnit selectedBaseUnit = BaseUnit.g;
     bool isExpiryTracked = true;
+    String? safetyStockError;
 
     await showDialog<void>(
       context: context,
@@ -203,9 +217,16 @@ class IngredientListScreen extends ConsumerWidget {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: '안전재고 (선택)',
+                      suffixText: selectedBaseUnit.name,
+                      errorText: safetyStockError,
                     ),
+                    onChanged: (_) {
+                      if (safetyStockError != null) {
+                        setState(() => safetyStockError = null);
+                      }
+                    },
                   ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
@@ -232,6 +253,13 @@ class IngredientListScreen extends ConsumerWidget {
                     factor == null) {
                   return;
                 }
+                final parsedSafety = parseSafetyStockInput(
+                  safetyStockController.text,
+                );
+                if (!parsedSafety.isValid) {
+                  setState(() => safetyStockError = _safetyStockErrorMessage);
+                  return;
+                }
                 await dao.insertIngredient(
                   IngredientsCompanion.insert(
                     name: nameController.text.trim(),
@@ -239,12 +267,7 @@ class IngredientListScreen extends ConsumerWidget {
                     purchaseUnit: purchaseUnitController.text.trim(),
                     conversionFactor: factor,
                     isExpiryTracked: isExpiryTracked,
-                    safetyStockQty: Value(() {
-                      final v = double.tryParse(
-                        safetyStockController.text.trim(),
-                      );
-                      return v == null || v <= 0 ? null : v;
-                    }()),
+                    safetyStockQty: Value(parsedSafety.value),
                   ),
                 );
                 if (context.mounted) Navigator.of(context).pop();
