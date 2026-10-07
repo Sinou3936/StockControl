@@ -80,6 +80,9 @@ String formatPurchaseOrderDate(DateTime date) =>
 /// 문자는 `_`로 바꾼다 — 거래처 이름에 `/` 같은 문자가 있어도 저장이
 /// 실패하지 않게 하려는 것이다.
 String purchaseOrderFileName(PurchaseOrder order, PurchaseOrderFormat format) {
+  // 이 문자 집합은 windows_file_picker의 validateFileName과 같아야 한다. 더
+  // 좁으면 그 플러그인이 isolate 안에서 예외를 던지는데 거기에는 onError가
+  // 없어서, 저장이 영원히 끝나지 않고 저장 버튼이 계속 막힌다.
   String clean(String text) =>
       text.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
 

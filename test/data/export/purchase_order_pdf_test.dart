@@ -60,6 +60,15 @@ void main() {
     expect(pageCount(await build(120)), greaterThan(1));
   });
 
+  test('PDF의 글꼴은 한글 글꼴이고 기본 Helvetica로 떨어지지 않는다', () async {
+    // 글꼴 사전은 압축되지 않아 글자로 읽을 수 있다. theme를 빼면 본문과 표가
+    // 기본 글꼴(Helvetica)로 쓰여 한글이 나오지 않는다.
+    final text = String.fromCharCodes(await build(3));
+
+    expect(text, contains('/NanumGothic'));
+    expect(text, isNot(contains('/Helvetica')));
+  });
+
   test('pubspec에 등록한 글꼴을 앱 번들에서 읽을 수 있다', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
 

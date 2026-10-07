@@ -223,6 +223,31 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('수량칸은 5자리까지만 받는다', (tester) async {
+    final exporter = await pumpScreen(tester);
+    await pickSupplier(tester, '가나다상사');
+
+    // 19자리를 넘는 수는 int로 읽히지 않아 그 줄이 파일에서 조용히 빠진다.
+    // 화면에는 체크된 채 숫자가 보이므로, 입력 자체를 5자리로 막는다.
+    await tester.enterText(
+      find.byKey(const Key('qty_1')),
+      '1234567890123456789012345',
+    );
+    await tester.pump();
+
+    expect(qtyText(tester, 1), '12345');
+    await tester.tap(find.byKey(const Key('savePdfButton')));
+    await tester.pump();
+    expect(
+      exporter.saved.single.order.lines
+          .map((l) => (l.ingredient.name, l.qty))
+          .toList(),
+      [('양파', 12345), ('당근', 1)],
+    );
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('거래처가 하나도 없으면 먼저 등록하라고 안내한다', (tester) async {
     await db.delete(db.suppliers).go();
 

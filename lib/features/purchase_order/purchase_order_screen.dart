@@ -235,7 +235,10 @@ class _PurchaseOrderScreenState extends ConsumerState<PurchaseOrderScreen> {
               controller: _qtyControllers[id],
               enabled: checked,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(5),
+              ],
               textAlign: TextAlign.end,
               decoration: const InputDecoration(isDense: true),
               onChanged: (_) => setState(() {}),
