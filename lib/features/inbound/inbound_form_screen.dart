@@ -14,7 +14,10 @@ import '../stock/store_switcher.dart';
 import '../supplier_management/supplier_list_screen.dart';
 
 class InboundFormScreen extends ConsumerStatefulWidget {
-  const InboundFormScreen({super.key});
+  const InboundFormScreen({super.key, this.initialIngredient});
+
+  /// 부족 재고 화면에서 넘어올 때 미리 선택해 둘 품목.
+  final Ingredient? initialIngredient;
 
   @override
   ConsumerState<InboundFormScreen> createState() => _InboundFormScreenState();
@@ -28,6 +31,12 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
   Supplier? _selectedSupplier;
   Ingredient? _selectedIngredient;
   DateTime? _expiryDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIngredient = widget.initialIngredient;
+  }
 
   @override
   void dispose() {

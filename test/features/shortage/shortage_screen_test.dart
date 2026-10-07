@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
+import 'package:stockcontrol/core/providers/store_providers.dart';
 import 'package:stockcontrol/data/local/database.dart';
+import 'package:stockcontrol/features/inbound/inbound_form_screen.dart';
 import 'package:stockcontrol/features/shortage/shortage_screen.dart';
 
 void main() {
@@ -154,5 +156,46 @@ void main() {
     expect(find.text('모든 품목이 기준 이상입니다'), findsOneWidget);
 
     await disposeScreen(tester);
+  });
+
+  testWidgets('부족 카드를 누르면 그 품목으로 입고 등록이 열리고, 전체를 보던 '
+      '사장은 그 매장이 선택된다', (tester) async {
+    final id = await addTrackedIngredient('양파', 5000);
+
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(owner());
+
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ShortageScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(container.read(selectedStoreProvider), isNull);
+
+    await tester.tap(find.byKey(Key('shortageCard_${id}_store-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InboundFormScreen), findsOneWidget);
+    expect(container.read(selectedStoreProvider)?.id, 'store-1');
+
+    final form = tester.widget<InboundFormScreen>(
+      find.byType(InboundFormScreen),
+    );
+    expect(form.initialIngredient?.id, id);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
   });
 }

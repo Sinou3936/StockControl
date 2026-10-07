@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/format/quantity_format.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/providers/shortage_providers.dart';
+import '../../core/providers/store_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
 import '../../domain/stock_shortage.dart';
+import '../inbound/inbound_form_screen.dart';
 import '../stock/store_switcher.dart';
 
 const _kContentMaxWidth = 1100.0;
@@ -103,85 +105,104 @@ class ShortageScreen extends ConsumerWidget {
   }
 }
 
-class _ShortageCard extends StatelessWidget {
+class _ShortageCard extends ConsumerWidget {
   const _ShortageCard({required this.shortage, required this.showStoreName});
 
   final StockShortage shortage;
   final bool showStoreName;
 
+  /// 부족한 품목을 바로 채울 수 있도록 입고 등록으로 보낸다. 사장이 전체 합산을
+  /// 보던 중이었다면 그 카드의 매장으로 선택을 옮긴다 — 입고 등록은 매장이
+  /// 정해져야 동작하고, 이 카드를 눌렀다는 것은 그 매장 일을 하겠다는 뜻이다.
+  void _openInbound(BuildContext context, WidgetRef ref) {
+    final session = ref.read(authSessionProvider);
+    if (session?.isOwner ?? false) {
+      ref.read(selectedStoreProvider.notifier).state = shortage.store;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => InboundFormScreen(
+          initialIngredient: shortage.ingredient,
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final empty = shortage.currentQty <= 0;
     final unit = shortage.ingredient.baseUnit;
 
-    return Container(
-      key: Key(
-        'shortageCard_${shortage.ingredient.id}_${shortage.store.id}',
-      ),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: empty ? AppColors.dangerBackground : AppColors.surface,
-        border: Border.all(
-          color: empty ? AppColors.dangerBorder : AppColors.border,
+    return InkWell(
+      key: Key('shortageCard_${shortage.ingredient.id}_${shortage.store.id}'),
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _openInbound(context, ref),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: empty ? AppColors.dangerBackground : AppColors.surface,
+          border: Border.all(
+            color: empty ? AppColors.dangerBorder : AppColors.border,
+          ),
+          borderRadius: BorderRadius.circular(12),
         ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  shortage.ingredient.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textStrong,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    shortage.ingredient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textStrong,
+                    ),
                   ),
                 ),
-              ),
-              if (showStoreName) ...[
-                const SizedBox(width: 8),
-                InfoChip(shortage.store.name),
+                if (showStoreName) ...[
+                  const SizedBox(width: 8),
+                  InfoChip(shortage.store.name),
+                ],
               ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${formatQty(shortage.currentQty)}$unit'
-            ' / 기준 ${formatQty(shortage.safetyStockQty)}$unit',
-            style: TextStyle(
-              fontSize: 13,
-              color: empty ? AppColors.danger : AppColors.textBody,
-              fontFeatures: AppTheme.tabularFigures,
             ),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: shortage.fillRatio.clamp(0.0, 1.0),
-              minHeight: 6,
-              backgroundColor: AppColors.chipBackground,
-              valueColor: AlwaysStoppedAnimation(
-                empty ? AppColors.danger : AppColors.primary,
+            const SizedBox(height: 8),
+            Text(
+              '${formatQty(shortage.currentQty)}$unit'
+              ' / 기준 ${formatQty(shortage.safetyStockQty)}$unit',
+              style: TextStyle(
+                fontSize: 13,
+                color: empty ? AppColors.danger : AppColors.textBody,
+                fontFeatures: AppTheme.tabularFigures,
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${formatQty(shortage.shortfall)}$unit 부족',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.danger,
-              fontFeatures: AppTheme.tabularFigures,
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: shortage.fillRatio.clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: AppColors.chipBackground,
+                valueColor: AlwaysStoppedAnimation(
+                  empty ? AppColors.danger : AppColors.primary,
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              '${formatQty(shortage.shortfall)}$unit 부족',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.danger,
+                fontFeatures: AppTheme.tabularFigures,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
