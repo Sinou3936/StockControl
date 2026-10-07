@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show FileSystemException, OSError;
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
@@ -346,6 +347,33 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.textContaining('저장하지 못했습니다'), findsOneWidget);
+    expect(onPressed(tester, 'savePdfButton'), isNotNull);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('파일을 쓰지 못하면 기술 문장 대신 알아볼 수 있는 안내를 보여준다', (tester) async {
+    final exporter = await pumpScreen(tester);
+    exporter.onSave = () async => throw const FileSystemException(
+      'Cannot open file',
+      'C:/x/a.pdf',
+      OSError('The process cannot access the file', 32),
+    );
+    await pickSupplier(tester, '가나다상사');
+
+    await tester.tap(find.byKey(const Key('savePdfButton')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(
+      find.text(
+        '저장하지 못했습니다. 같은 이름의 파일이 PDF 뷰어나 엑셀에서 열려 있으면 닫고 다시 시도하세요. '
+        '저장 위치에 쓸 수 있는지도 확인해 주세요.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('errno'), findsNothing);
+    expect(find.textContaining('FileSystemException'), findsNothing);
     expect(onPressed(tester, 'savePdfButton'), isNotNull);
 
     await disposeScreen(tester);

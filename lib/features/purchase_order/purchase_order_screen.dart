@@ -1,3 +1,6 @@
+import 'dart:io' show FileSystemException;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,10 +103,19 @@ class _PurchaseOrderScreenState extends ConsumerState<PurchaseOrderScreen> {
         ).showSnackBar(SnackBar(content: Text('저장했습니다: $shown')));
       }
     } catch (e) {
+      // 기술적인 원문은 사용자에게 보이지 않고 개발자 로그에만 남긴다.
+      debugPrint('[purchase-order] 저장 실패: $e');
       if (!mounted) return;
+      // 파일을 쓰지 못한 경우(같은 이름의 파일이 열려 있음, 쓰기 권한 없음 등)
+      // 는 흔해서 알아볼 수 있는 말로 안내한다. 원인을 모르는 다른 에러는
+      // 숨기지 않고 그대로 보여준다.
+      final message = e is FileSystemException
+          ? '저장하지 못했습니다. 같은 이름의 파일이 PDF 뷰어나 엑셀에서 열려 있으면 닫고 다시 시도하세요. '
+                '저장 위치에 쓸 수 있는지도 확인해 주세요.'
+          : '저장하지 못했습니다: $e';
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('저장하지 못했습니다: $e')));
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
