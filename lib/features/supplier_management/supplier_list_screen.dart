@@ -46,6 +46,9 @@ class SupplierListScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        // 데스크톱에서는 IndexedStack이 거래처·품목 화면을 동시에 살려두므로
+        // 기본 Hero 태그를 쓰면 화면 전환 때 태그가 충돌해 예외가 난다.
+        heroTag: 'supplierAddFab',
         onPressed: () => _showAddDialog(context, dao),
         child: const Icon(Icons.add),
       ),

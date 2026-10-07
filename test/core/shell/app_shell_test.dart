@@ -27,7 +27,7 @@ void main() {
       );
 
   testWidgets(
-      'shows a navigation rail with 5 destinations on wide screens and '
+      'shows a navigation rail with 6 destinations on wide screens and '
       'switches the selected content', (tester) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -52,8 +52,8 @@ void main() {
   });
 
   testWidgets(
-      'shows a bottom nav with 4 items on narrow screens and opens '
-      'MoreScreen from the fourth item', (tester) async {
+      'shows a bottom nav with 5 items on narrow screens and opens '
+      'MoreScreen from the last item', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -185,7 +185,7 @@ void main() {
 
     await tester.tap(find.text('품목 관리'));
     await tester.pump();
-    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 4);
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 5);
 
     tester.view.physicalSize = const Size(390, 800);
     await tester.pump();
@@ -200,7 +200,7 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 4);
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 5);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
@@ -236,6 +236,103 @@ void main() {
     await tester.pump();
 
     expect(fake.syncCalls, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('부족 탭이 데스크톱 사이드바와 폰 하단 탭 모두에 있다', (tester) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(wrap());
+    await tester.pump();
+
+    expect(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('부족 재고'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('부족 재고'),
+      ),
+    );
+    await tester.pump();
+    expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 3);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('탭이 늘어난 뒤에도 폰 하단의 더보기가 열린다', (tester) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(wrap());
+    await tester.pump();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text('더보기'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MoreScreen), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('탭이 늘어난 뒤에도 사장 전용 항목이 올바른 화면을 연다',
+      (tester) async {
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'owner@internal.local',
+            pin: '123456',
+            displayName: '사장님',
+            role: 'owner',
+          ),
+        );
+
+    tester.view.physicalSize = const Size(1000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AppShell()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('직원 추가'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('직원 추가'), findsWidgets);
+    expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

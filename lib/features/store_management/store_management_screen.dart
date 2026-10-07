@@ -41,6 +41,9 @@ class StoreManagementScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        // 이 화면은 push되어 열리므로 뒤에 살아 있는 목록 화면들의 FAB과
+        // 공존한다. 태그가 겹치지 않도록 따로 준다.
+        heroTag: 'storeAddFab',
         onPressed: () => _showAddDialog(context, repository),
         child: const Icon(Icons.add),
       ),

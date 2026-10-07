@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/count/count_screen.dart';
 import '../../features/ingredient_management/ingredient_list_screen.dart';
 import '../../features/inbound/inbound_form_screen.dart';
+import '../../features/shortage/shortage_screen.dart';
 import '../../features/stock_overview/stock_overview_screen.dart';
 import '../../features/supplier_management/supplier_list_screen.dart';
 import '../providers/auth_providers.dart';
+import '../providers/shortage_providers.dart';
 import '../providers/sync_providers.dart';
 import '../theme/app_theme.dart';
 import 'auth_add_staff_route.dart';
@@ -29,6 +31,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     StockOverviewScreen(),
     InboundFormScreen(),
     CountScreen(),
+    ShortageScreen(),
   ];
 
   static const _desktopExtraScreens = [
@@ -51,11 +54,11 @@ class _AppShellState extends ConsumerState<AppShell> {
           NavigationRail(
             selectedIndex: _selectedIndex,
             onDestinationSelected: (index) {
-              if (isOwner && index == 5) {
+              if (isOwner && index == 6) {
                 pushAddStaffScreen(context);
                 return;
               }
-              if (isOwner && index == 6) {
+              if (isOwner && index == 7) {
                 pushStoreManagementScreen(context);
                 return;
               }
@@ -74,6 +77,10 @@ class _AppShellState extends ConsumerState<AppShell> {
               const NavigationRailDestination(
                 icon: Icon(Icons.fact_check_outlined),
                 label: Text('마감 실사'),
+              ),
+              NavigationRailDestination(
+                icon: _ShortageIcon(count: ref.watch(shortageCountProvider)),
+                label: const Text('부족 재고'),
               ),
               const NavigationRailDestination(
                 icon: Icon(Icons.store_outlined),
@@ -191,7 +198,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         child: BottomNavigationBar(
           currentIndex: index,
           onTap: (index) {
-            if (index == 3) {
+            if (index == 4) {
               Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const MoreScreen()));
@@ -199,20 +206,47 @@ class _AppShellState extends ConsumerState<AppShell> {
             }
             setState(() => _selectedIndex = index);
           },
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.inventory_2_outlined),
               label: '재고',
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.input), label: '입고'),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.input),
+              label: '입고',
+            ),
+            const BottomNavigationBarItem(
               icon: Icon(Icons.fact_check_outlined),
               label: '실사',
             ),
-            BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: '더보기'),
+            BottomNavigationBarItem(
+              icon: _ShortageIcon(count: ref.watch(shortageCountProvider)),
+              label: '부족',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.more_horiz),
+              label: '더보기',
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 부족 건수를 아이콘 위에 빨간 숫자로 올린다. 0이면 숫자를 숨긴다.
+class _ShortageIcon extends StatelessWidget {
+  const _ShortageIcon({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text('$count'),
+      backgroundColor: AppColors.danger,
+      child: const Icon(Icons.report_problem_outlined),
     );
   }
 }
