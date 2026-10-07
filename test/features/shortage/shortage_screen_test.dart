@@ -8,6 +8,7 @@ import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/core/providers/store_providers.dart';
 import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/features/inbound/inbound_form_screen.dart';
+import 'package:stockcontrol/features/purchase_order/purchase_order_screen.dart';
 import 'package:stockcontrol/features/shortage/shortage_screen.dart';
 
 void main() {
@@ -272,6 +273,72 @@ void main() {
       find.byKey(const Key('ingredientDropdown')),
     );
     expect(dropdown.initialValue?.id, id);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('전체 합산을 보는 사장은 발주서를 만들 수 없고 이유가 보인다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+
+    await pumpScreen(tester, owner());
+
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('purchaseOrderButton')),
+    );
+    expect(button.onPressed, isNull);
+    expect(find.text('매장을 고르면 발주서를 만들 수 있습니다'), findsOneWidget);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('직원 계정에는 발주서 만들기 버튼이 없다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+
+    await pumpScreen(tester, staff(storeId: 'store-1'));
+
+    expect(find.byKey(const Key('purchaseOrderButton')), findsNothing);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('매장을 고른 사장이 누르면 그 매장의 부족 품목으로 발주서 화면이 열린다', (tester) async {
+    final id = await addTrackedIngredient('양파', 5000);
+
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(owner());
+    container.read(selectedStoreProvider.notifier).state = const Store(
+      id: 'store-1',
+      name: '울산점',
+    );
+
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ShortageScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    await tester.tap(find.byKey(const Key('purchaseOrderButton')));
+    await tester.pumpAndSettle();
+
+    final screen = tester.widget<PurchaseOrderScreen>(
+      find.byType(PurchaseOrderScreen),
+    );
+    expect(screen.store.id, 'store-1');
+    expect(screen.shortages, hasLength(1));
+    expect(screen.shortages.single.store.id, 'store-1');
+    expect(screen.shortages.single.ingredient.id, id);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));

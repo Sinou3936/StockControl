@@ -7,8 +7,10 @@ import '../../core/providers/shortage_providers.dart';
 import '../../core/providers/store_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
+import '../../data/local/database.dart';
 import '../../domain/stock_shortage.dart';
 import '../inbound/inbound_form_screen.dart';
+import '../purchase_order/purchase_order_screen.dart';
 import '../stock/store_switcher.dart';
 
 const _kContentMaxWidth = 1100.0;
@@ -37,14 +39,24 @@ class ShortageScreen extends ConsumerWidget {
         title: const Text('부족 재고'),
         actions: const [StoreSwitcher()],
       ),
-      body: shortages.isEmpty
-          ? _buildEmpty(
-              hasTrackedIngredient: hasTrackedIngredient,
-              hasStoreInScope: hasStoreInScope,
-              isOwner: isOwner,
-              hasAssignedStore: session?.storeId != null,
-            )
-          : _buildGrid(shortages, showStoreName: isOwner),
+      body: Column(
+        children: [
+          // 발주는 사장이 한다. 판정할 매장이 없으면 빈 상태 안내가 이미 매장
+          // 등록을 알려주므로 버튼은 보이지 않는다.
+          if (isOwner && hasStoreInScope)
+            _PurchaseOrderBar(shortages: shortages),
+          Expanded(
+            child: shortages.isEmpty
+                ? _buildEmpty(
+                    hasTrackedIngredient: hasTrackedIngredient,
+                    hasStoreInScope: hasStoreInScope,
+                    isOwner: isOwner,
+                    hasAssignedStore: session?.storeId != null,
+                  )
+                : _buildGrid(shortages, showStoreName: isOwner),
+          ),
+        ],
+      ),
     );
   }
 
@@ -245,6 +257,61 @@ class _ShortageCard extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "발주서 만들기" 버튼. 발주서는 매장 하나 단위라서 사장이 전체 합산을
+/// 보는 중에는 누를 수 없다.
+class _PurchaseOrderBar extends ConsumerWidget {
+  const _PurchaseOrderBar({required this.shortages});
+
+  final List<StockShortage> shortages;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final store = ref.watch(selectedStoreProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (store == null)
+              const Flexible(
+                child: Text(
+                  '매장을 고르면 발주서를 만들 수 있습니다',
+                  style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                ),
+              ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              key: const Key('purchaseOrderButton'),
+              onPressed: store == null ? null : () => _open(context, store),
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('발주서 만들기'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 누른 순간의 부족 목록을 복사해서 넘긴다. 발주서 화면이 부족 목록을 계속
+  /// 지켜보면, 입력 중에 동기화로 재고가 바뀔 때 수량이 덮인다.
+  void _open(BuildContext context, Store store) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PurchaseOrderScreen(
+          store: store,
+          shortages: [
+            for (final shortage in shortages)
+              if (shortage.store.id == store.id) shortage,
+          ],
         ),
       ),
     );
