@@ -145,13 +145,16 @@ void main() {
     expect(shortages.single.store.id, 'store-2');
   });
 
-  test('한 스트림이 로딩 중이면 빈 목록을 반환한다', () async {
+  // 세 스트림을 각각 따로 막는다. 하나만 확인하면 나머지 두 가드 절을 지워도
+  // 테스트가 통과해서, 일부 데이터로 계산하는 회귀를 잡지 못한다.
+  Stream<T> neverEmits<T>() => Stream.fromFuture(Completer<T>().future);
+
+  test('재고 합계 스트림이 로딩 중이면 빈 목록을 반환한다', () async {
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         stockLevelsStreamProvider.overrideWith(
-          (_) =>
-              Stream.fromFuture(Completer<List<StoreStockLevel>>().future),
+          (_) => neverEmits<List<StoreStockLevel>>(),
         ),
       ],
     );
@@ -159,8 +162,36 @@ void main() {
     container.read(authSessionProvider.notifier).setSession(owner());
     await settle(container);
 
-    final shortages = container.read(shortagesProvider);
+    expect(container.read(shortagesProvider), isEmpty);
+  });
 
-    expect(shortages, isEmpty);
+  test('품목 스트림이 로딩 중이면 빈 목록을 반환한다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        ingredientsStreamProvider.overrideWith(
+          (_) => neverEmits<List<Ingredient>>(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(owner());
+    await settle(container);
+
+    expect(container.read(shortagesProvider), isEmpty);
+  });
+
+  test('매장 스트림이 로딩 중이면 빈 목록을 반환한다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        storesStreamProvider.overrideWith((_) => neverEmits<List<Store>>()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(owner());
+    await settle(container);
+
+    expect(container.read(shortagesProvider), isEmpty);
   });
 }

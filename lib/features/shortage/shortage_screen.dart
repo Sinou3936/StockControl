@@ -28,7 +28,8 @@ class ShortageScreen extends ConsumerWidget {
     final hasTrackedIngredient = ingredients.any(
       (i) => (i.safetyStockQty ?? 0) > 0,
     );
-    final isOwner = ref.watch(authSessionProvider)?.isOwner ?? false;
+    final session = ref.watch(authSessionProvider);
+    final isOwner = session?.isOwner ?? false;
     final hasStoreInScope = ref.watch(shortageStoresProvider).isNotEmpty;
 
     return Scaffold(
@@ -40,6 +41,8 @@ class ShortageScreen extends ConsumerWidget {
           ? _buildEmpty(
               hasTrackedIngredient: hasTrackedIngredient,
               hasStoreInScope: hasStoreInScope,
+              isOwner: isOwner,
+              hasAssignedStore: session?.storeId != null,
             )
           : _buildGrid(shortages, showStoreName: isOwner),
     );
@@ -48,15 +51,26 @@ class ShortageScreen extends ConsumerWidget {
   Widget _buildEmpty({
     required bool hasTrackedIngredient,
     required bool hasStoreInScope,
+    required bool isOwner,
+    required bool hasAssignedStore,
   }) {
     // 판정할 매장이 없으면 부족이 없는 것이 아니라 아무것도 보지 않은 것이다.
     // 이걸 "기준 이상"으로 안내하면 재고가 충분하다는 뜻으로 읽혀서, 알림
     // 기능이 있으나 마나 해진다.
+    //
+    // 원인이 역할마다 다르고, 할 수 있는 조치도 다르다. 사장은 매장을 등록하면
+    // 되고, 매장이 지정되지 않은 직원은 사장에게 요청해야 하고, 지정은 됐는데
+    // 그 매장이 로컬에 없는 직원은 동기화를 기다려야 한다. 한 문구로 뭉치면
+    // 세 경우 중 둘에게는 거짓이 된다.
     if (!hasStoreInScope) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.storefront_outlined,
         title: '판정할 매장이 없습니다',
-        message: '계정에 매장이 지정되지 않았거나, 매장 정보를 아직 받지 못했습니다',
+        message: isOwner
+            ? '매장 관리에서 매장을 등록하면 매장별로 부족한 품목을 확인할 수 있습니다'
+            : hasAssignedStore
+                ? '매장 정보를 아직 받지 못했습니다. 동기화한 뒤 다시 확인해주세요'
+                : '계정에 매장이 지정되지 않았습니다. 사장님께 매장 지정을 요청해주세요',
       );
     }
     if (!hasTrackedIngredient) {
@@ -150,83 +164,86 @@ class _ShortageCard extends ConsumerWidget {
     final empty = shortage.currentQty <= 0;
     final unit = shortage.ingredient.baseUnit;
 
-    // 배경색을 Material이 칠하고 그 안에 InkWell을 둔다. 순서를 뒤집어 불투명한
-    // Container를 InkWell의 자식으로 두면 물결이 그 배경 아래에 깔려 보이지
-    // 않는다. 재고 조회의 로트 행과 AppListCard가 쓰는 구조와 같다.
-    return Container(
+    // 배경·테두리·반지름을 Material 하나가 맡고 그 안에 InkWell을 둔다.
+    //
+    // 불투명한 Container를 InkWell의 자식으로 두면 물결이 그 배경 아래에 깔려
+    // 보이지 않는다. 반대로 테두리를 바깥 Container의 decoration에 맡기면,
+    // Container가 자식을 테두리 두께만큼 사각으로만 밀어 넣기 때문에 둥근
+    // 모서리의 호 구간에서 자식 배경이 테두리를 덮어 모서리 테두리가 사라진다.
+    // shape를 쓰면 Material이 테두리를 자식보다 위에 그릴 경로를 직접 알아서,
+    // 모서리가 남고 물결도 같은 경로로 잘린다.
+    return Material(
+      color: empty ? AppColors.dangerBackground : AppColors.surface,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        border: Border.all(
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
           color: empty ? AppColors.dangerBorder : AppColors.border,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Material(
-        color: empty ? AppColors.dangerBackground : AppColors.surface,
-        child: InkWell(
-          key: Key(
-            'shortageCard_${shortage.ingredient.id}_${shortage.store.id}',
-          ),
-          onTap: () => _openInbound(context, ref),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        shortage.ingredient.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textStrong,
-                        ),
+      child: InkWell(
+        key: Key(
+          'shortageCard_${shortage.ingredient.id}_${shortage.store.id}',
+        ),
+        onTap: () => _openInbound(context, ref),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      shortage.ingredient.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textStrong,
                       ),
                     ),
-                    if (showStoreName) ...[
-                      const SizedBox(width: 8),
-                      InfoChip(shortage.store.name),
-                    ],
+                  ),
+                  if (showStoreName) ...[
+                    const SizedBox(width: 8),
+                    InfoChip(shortage.store.name),
                   ],
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${formatQty(shortage.currentQty)}$unit'
+                ' / 기준 ${formatQty(shortage.safetyStockQty)}$unit',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: empty ? AppColors.danger : AppColors.textBody,
+                  fontFeatures: AppTheme.tabularFigures,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${formatQty(shortage.currentQty)}$unit'
-                  ' / 기준 ${formatQty(shortage.safetyStockQty)}$unit',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: empty ? AppColors.danger : AppColors.textBody,
-                    fontFeatures: AppTheme.tabularFigures,
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: shortage.fillRatio.clamp(0.0, 1.0),
+                  minHeight: 6,
+                  backgroundColor: AppColors.chipBackground,
+                  valueColor: AlwaysStoppedAnimation(
+                    empty ? AppColors.danger : AppColors.primary,
                   ),
                 ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: shortage.fillRatio.clamp(0.0, 1.0),
-                    minHeight: 6,
-                    backgroundColor: AppColors.chipBackground,
-                    valueColor: AlwaysStoppedAnimation(
-                      empty ? AppColors.danger : AppColors.primary,
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${formatQty(shortage.shortfall)}$unit 부족',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.danger,
+                  fontFeatures: AppTheme.tabularFigures,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${formatQty(shortage.shortfall)}$unit 부족',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.danger,
-                    fontFeatures: AppTheme.tabularFigures,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

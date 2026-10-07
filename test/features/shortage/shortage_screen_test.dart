@@ -146,6 +146,63 @@ void main() {
 
     expect(find.text('판정할 매장이 없습니다'), findsOneWidget);
     expect(find.text('모든 품목이 기준 이상입니다'), findsNothing);
+    expect(
+      find.text('매장 정보를 아직 받지 못했습니다. 동기화한 뒤 다시 확인해주세요'),
+      findsOneWidget,
+    );
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('매장이 지정되지 않은 직원에게는 사장에게 요청하라고 안내한다',
+      (tester) async {
+    await addTrackedIngredient('양파', 5000);
+
+    await pumpScreen(tester, staff());
+
+    expect(
+      find.text('계정에 매장이 지정되지 않았습니다. 사장님께 매장 지정을 요청해주세요'),
+      findsOneWidget,
+    );
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('매장을 등록하지 않은 사장에게는 매장 등록을 안내한다', (tester) async {
+    // 매장을 전부 지운 상태 — 새로 설치한 사장이 처음 이 탭을 누르는 경우다.
+    // 사장에게 "계정에 매장 미지정"이나 "동기화"를 안내하면 둘 다 거짓이고,
+    // 정작 할 수 있는 조치를 가리키지 않는다.
+    await db.delete(db.stores).go();
+    await addTrackedIngredient('양파', 5000);
+
+    await pumpScreen(tester, owner());
+
+    expect(find.text('판정할 매장이 없습니다'), findsOneWidget);
+    expect(
+      find.text('매장 관리에서 매장을 등록하면 매장별로 부족한 품목을 확인할 수 있습니다'),
+      findsOneWidget,
+    );
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('매장도 없고 추적 품목도 없으면 매장 안내가 먼저다', (tester) async {
+    // 두 빈 상태 조건이 동시에 참인 경우. 순서가 뒤집히면 직원에게 "품목 관리
+    // 에서 안전재고를 정하세요"라고, 직원이 할 수 없는 일을 안내하게 된다.
+    await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+      ),
+    );
+
+    await pumpScreen(tester, staff());
+
+    expect(find.text('판정할 매장이 없습니다'), findsOneWidget);
+    expect(find.text('안전재고가 설정된 품목이 없습니다'), findsNothing);
 
     await disposeScreen(tester);
   });
