@@ -117,9 +117,24 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
                     stream: ingredientDao.watchAll(),
                     builder: (context, snapshot) {
                       final ingredients = snapshot.data ?? [];
+
+                      // 붙잡아 둔 품목 객체는 그 품목의 안전재고가 바뀌면
+                      // 목록의 어떤 항목과도 같지 않게 된다 — drift가 생성한
+                      // ==가 그 필드를 포함하기 때문이다. 그대로 넘기면
+                      // 드롭다운이 "값에 해당하는 항목이 정확히 하나여야
+                      // 한다"는 단정에 걸려 화면이 깨진다. 같은 id 항목으로
+                      // 맞춰 넘긴다. StoreSwitcher도 같은 방어를 쓴다.
+                      Ingredient? current;
+                      final held = _selectedIngredient;
+                      if (held != null) {
+                        for (final i in ingredients) {
+                          if (i.id == held.id) current = i;
+                        }
+                      }
+
                       return DropdownButtonFormField<Ingredient>(
                         key: const Key('ingredientDropdown'),
-                        initialValue: _selectedIngredient,
+                        initialValue: current,
                         decoration: const InputDecoration(labelText: '품목'),
                         items: ingredients
                             .map(

@@ -69,4 +69,72 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  testWidgets(
+      '미리 고른 품목의 안전재고가 바뀌어도 품목 드롭다운이 깨지지 않는다',
+      (tester) async {
+    // drift가 생성한 Ingredient.==는 safetyStockQty를 포함한다. 폼이 품목
+    // 객체를 붙잡아 둔 상태에서 그 값이 바뀌면(사장이 고쳤거나 동기화로
+    // 받았거나) 붙잡은 객체가 새 목록의 어떤 항목과도 같지 않게 되어,
+    // DropdownButton이 "값에 해당하는 항목이 정확히 하나" 단정에 걸린다.
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    final id = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: false,
+      ),
+    );
+    // watchAll().first를 testWidgets 안에서 기다리면 멈춘다. 한 번 읽는
+    // 쿼리는 괜찮다.
+    final ingredient = (await db.select(db.ingredients).get()).firstWhere(
+      (i) => i.id == id,
+    );
+
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(
+          AuthSession(
+            id: 'user-1',
+            email: 'staff1@internal.local',
+            pin: '111111',
+            displayName: '직원1',
+            role: 'staff',
+            storeId: 'store-1',
+            storeName: '울산점',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: InboundFormScreen(initialIngredient: ingredient),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    await db.ingredientDao.updateSafetyStock(id, 6000);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+
+    final dropdown = tester.widget<DropdownButtonFormField<Ingredient>>(
+      find.byKey(const Key('ingredientDropdown')),
+    );
+    expect(dropdown.initialValue?.id, id);
+    expect(dropdown.initialValue?.safetyStockQty, 6000);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
 }

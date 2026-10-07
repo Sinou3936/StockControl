@@ -1,8 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
 import '../../core/providers/dao_providers.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
 import '../../data/local/daos/ingredient_dao.dart';
 import '../../data/local/database.dart';
@@ -37,15 +39,22 @@ class IngredientListScreen extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final ingredient = ingredients[index];
+                final safety = ingredient.safetyStockQty;
                 return AppListCard(
                   title: ingredient.name,
                   subtitle:
                       '${ingredient.purchaseUnit} = '
                       '${formatQty(ingredient.conversionFactor)}'
                       '${ingredient.baseUnit}',
-                  trailing: ingredient.isExpiryTracked
-                      ? const InfoChip('유통기한 관리')
-                      : null,
+                  trailing: safety == null
+                      ? (ingredient.isExpiryTracked
+                            ? const InfoChip('유통기한 관리')
+                            : null)
+                      : InfoChip(
+                          '안전재고 ${formatQty(safety)}${ingredient.baseUnit}',
+                        ),
+                  onTap: () =>
+                      _showSafetyStockDialog(context, dao, ingredient),
                 );
               },
             ),
@@ -62,10 +71,75 @@ class IngredientListScreen extends ConsumerWidget {
     );
   }
 
+  /// 안전재고 값만 고친다. 이름·단위·환산계수는 과거 로트와 어긋날 수 있어
+  /// 이번 범위에서 수정 대상이 아니다.
+  Future<void> _showSafetyStockDialog(
+    BuildContext context,
+    IngredientDao dao,
+    Ingredient ingredient,
+  ) async {
+    final controller = TextEditingController(
+      text: ingredient.safetyStockQty == null
+          ? ''
+          : formatQty(ingredient.safetyStockQty!).replaceAll(',', ''),
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${ingredient.name} 안전재고'),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                key: const Key('safetyStockField'),
+                controller: controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: '안전재고',
+                  suffixText: ingredient.baseUnit,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '비워 두면 이 품목은 부족 알림에서 제외됩니다.',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final parsed = double.tryParse(controller.text.trim());
+              await dao.updateSafetyStock(
+                ingredient.id,
+                parsed == null || parsed <= 0 ? null : parsed,
+              );
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showAddDialog(BuildContext context, IngredientDao dao) async {
     final nameController = TextEditingController();
     final purchaseUnitController = TextEditingController();
     final conversionFactorController = TextEditingController();
+    final safetyStockController = TextEditingController();
     BaseUnit selectedBaseUnit = BaseUnit.g;
     bool isExpiryTracked = true;
 
@@ -122,6 +196,17 @@ class IngredientListScreen extends ConsumerWidget {
                       decimal: true,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('newSafetyStockField'),
+                    controller: safetyStockController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: '안전재고 (선택)',
+                    ),
+                  ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
@@ -154,6 +239,12 @@ class IngredientListScreen extends ConsumerWidget {
                     purchaseUnit: purchaseUnitController.text.trim(),
                     conversionFactor: factor,
                     isExpiryTracked: isExpiryTracked,
+                    safetyStockQty: Value(() {
+                      final v = double.tryParse(
+                        safetyStockController.text.trim(),
+                      );
+                      return v == null || v <= 0 ? null : v;
+                    }()),
                   ),
                 );
                 if (context.mounted) Navigator.of(context).pop();
