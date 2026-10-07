@@ -314,29 +314,33 @@ class _PurchaseOrderBarState extends ConsumerState<_PurchaseOrderBar> {
 
   /// 누른 순간의 부족 목록을 복사해서 넘긴다. 발주서 화면이 부족 목록을 계속
   /// 지켜보면, 입력 중에 동기화로 재고가 바뀔 때 수량이 덮인다.
+  ///
+  /// 복사본은 push 이전에 만들어 라우트 빌더가 지역 변수만 닫게 한다.
+  /// MaterialPageRoute의 빌더는 한 번만 실행되지 않는다(라우트가 의존하는 것이
+  /// 바뀌면 다시 실행된다). 빌더가 `widget.shortages`를 읽으면 그때의 최신
+  /// 목록이 넘어가서, 발주서 화면이 처음 만든 수량칸과 목록이 어긋난다.
   Future<void> _open(BuildContext context, Store store) async {
     // 두 번째 누름이 화면이 다시 그려지기 전에 들어올 수 있어서(setState는
     // 다음 프레임에야 반영된다) 먼저 동기적으로 막는다.
     if (_opening) return;
-    _opening = true;
-    // 누르는 동안 버튼도 비활성으로 보이게 한다.
-    setState(() {});
     // 선택해 둔 Store 객체는 고른 뒤에 매장 이름이 바뀌어도 옛 값이다. 발주서의
     // 매장 이름과 파일 이름에 옛 이름이 찍히지 않도록 최신 행을 id로 다시
     // 찾는다. 찾지 못하면 붙잡고 있던 객체를 쓴다.
     final latest = ref
         .read(shortageStoresProvider)
         .firstWhere((s) => s.id == store.id, orElse: () => store);
+    final snapshot = [
+      for (final shortage in widget.shortages)
+        if (shortage.store.id == store.id) shortage,
+    ];
+    _opening = true;
+    // 누르는 동안 버튼도 비활성으로 보이게 한다.
+    setState(() {});
     try {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => PurchaseOrderScreen(
-            store: latest,
-            shortages: [
-              for (final shortage in widget.shortages)
-                if (shortage.store.id == store.id) shortage,
-            ],
-          ),
+          builder: (_) =>
+              PurchaseOrderScreen(store: latest, shortages: snapshot),
         ),
       );
     } finally {

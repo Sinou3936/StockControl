@@ -423,6 +423,78 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('누른 뒤에 부족 목록이 바뀌고 라우트가 다시 만들어져도 발주서 화면이 받은 목록은 '
+      '그대로다', (tester) async {
+    final id = await addTrackedIngredient('양파', 5000);
+    await pumpOwnerWithStore(tester);
+
+    await tester.tap(find.byKey(const Key('purchaseOrderButton')));
+    await tester.pumpAndSettle();
+
+    final before = tester
+        .widget<PurchaseOrderScreen>(find.byType(PurchaseOrderScreen))
+        .shortages;
+    expect(before, hasLength(1));
+    expect(before.single.ingredient.id, id);
+
+    // 누른 뒤에 동기화로 재고가 들어와 울산점의 부족이 사라진 상황. 아래에 깔린
+    // 부족 화면은 새 목록(빈 목록)으로 다시 그려진다.
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: id,
+        storeId: const Value('store-1'),
+        receivedDate: DateTime(2026, 10, 1),
+        unitCost: 10,
+        remainingQty: 100000,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // 부족 화면이 실제로 새 목록(빈 목록)을 받았는지 확인한다. 이게 아니면 아래
+    // 검사는 아무것도 증명하지 못한다.
+    expect(find.text('모든 품목이 기준 이상입니다', skipOffstage: false), findsOneWidget);
+
+    // 라우트가 의존하는 것이 바뀐 것처럼 라우트 빌더를 다시 실행시킨다.
+    // ignore: invalid_use_of_protected_member
+    ModalRoute.of(
+      tester.element(find.byType(PurchaseOrderScreen)),
+    )!.changedExternalState();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final after = tester
+        .widget<PurchaseOrderScreen>(find.byType(PurchaseOrderScreen))
+        .shortages;
+    expect(after, hasLength(1));
+    expect(after.single.ingredient.id, id);
+    expect(after.single.store.id, 'store-1');
+    expect(tester.takeException(), isNull);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('발주서 화면이 열려 있는 동안 발주서 만들기 버튼은 비활성이다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+    await pumpOwnerWithStore(tester);
+
+    await tester.tap(find.byKey(const Key('purchaseOrderButton')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(PurchaseOrderScreen), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('purchaseOrderButton'), skipOffstage: false),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('발주서 화면에서 돌아오면 발주서 만들기 버튼이 다시 눌린다', (tester) async {
     await addTrackedIngredient('양파', 5000);
     await pumpOwnerWithStore(tester);
