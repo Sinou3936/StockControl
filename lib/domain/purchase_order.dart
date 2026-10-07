@@ -76,6 +76,13 @@ String _two(int n) => n.toString().padLeft(2, '0');
 String formatPurchaseOrderDate(DateTime date) =>
     '${date.year}-${_two(date.month)}-${_two(date.day)}';
 
+/// PDF 모든 쪽 아래에 찍는 한 줄. 낱장으로 흩어져도 어느 발주서인지 알 수 있게.
+String purchaseOrderFooterText(
+  PurchaseOrder order,
+  int pageNumber,
+  int pagesCount,
+) => '${order.store.name} · ${order.supplier.name} · $pageNumber/$pagesCount쪽';
+
 /// `발주서_{매장}_{거래처}_{yyyyMMdd}.{확장자}`. 파일 이름에 쓸 수 없는
 /// 문자는 `_`로 바꾼다 — 거래처 이름에 `/` 같은 문자가 있어도 저장이
 /// 실패하지 않게 하려는 것이다.

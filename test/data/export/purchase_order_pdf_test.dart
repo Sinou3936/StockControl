@@ -69,6 +69,15 @@ void main() {
     expect(text, isNot(contains('/Helvetica')));
   });
 
+  test('여러 쪽 PDF도 쪽 아래 글 때문에 Helvetica로 떨어지지 않는다', () async {
+    // 모든 쪽 아래에 찍는 글은 본문과 따로 만든 글 상자다. 거기서 글꼴이 빠지면
+    // 한글이 나오지 않는다. 쪽이 여러 개일 때도 확인한다.
+    final text = String.fromCharCodes(await build(120));
+
+    expect(text, contains('/NanumGothic'));
+    expect(text, isNot(contains('/Helvetica')));
+  });
+
   test('pubspec에 등록한 글꼴을 앱 번들에서 읽을 수 있다', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
 

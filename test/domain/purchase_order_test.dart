@@ -155,4 +155,17 @@ void main() {
       );
     });
   });
+
+  group('purchaseOrderFooterText', () {
+    test('매장, 거래처, 쪽번호를 한 줄로 만든다', () {
+      final order = PurchaseOrder(
+        store: ulsan,
+        supplier: makeSupplier('가나다상사'),
+        date: DateTime(2026, 10, 7),
+        lines: const [],
+      );
+
+      expect(purchaseOrderFooterText(order, 2, 5), '울산점 · 가나다상사 · 2/5쪽');
+    });
+  });
 }

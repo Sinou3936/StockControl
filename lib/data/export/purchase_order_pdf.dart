@@ -26,6 +26,19 @@ Future<Uint8List> buildPurchaseOrderPdf(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
+      // 모든 쪽 아래에 매장·거래처·쪽번호를 찍는다. 줄이 많아 여러 쪽이 된
+      // 발주서가 낱장으로 흩어져도 어느 발주서인지 알 수 있다.
+      footer: (context) => pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text(
+          purchaseOrderFooterText(
+            order,
+            context.pageNumber,
+            context.pagesCount,
+          ),
+          style: const pw.TextStyle(fontSize: 9),
+        ),
+      ),
       build: (context) => [
         pw.Text('발주서', style: pw.TextStyle(font: bold, fontSize: 24)),
         pw.SizedBox(height: 16),
