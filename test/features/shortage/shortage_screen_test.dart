@@ -343,4 +343,84 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  /// 사장이 울산점을 고른 상태로 부족 화면을 띄운다.
+  Future<void> pumpOwnerWithStore(WidgetTester tester) async {
+    final container = ProviderContainer(
+      overrides: [appDatabaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+    container.read(authSessionProvider.notifier).setSession(owner());
+    container.read(selectedStoreProvider.notifier).state = const Store(
+      id: 'store-1',
+      name: '울산점',
+    );
+
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ShortageScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  testWidgets('발주서 만들기를 빠르게 두 번 눌러도 발주서 화면은 하나만 열린다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+    await pumpOwnerWithStore(tester);
+
+    // 사이에 pump 없이 같은 버튼 동작을 두 번 부른다. 두 번째가 화면이 다시
+    // 그려지기 전에 들어오므로 setState가 아니라 동기적인 표시로 막아야 한다.
+    //
+    // tester.tap을 두 번 쓰지 않는 이유: Navigator는 push 직후 그 프레임 동안
+    // 포인터를 흡수해서 두 번째 탭이 버튼에 닿지 않는다(가드가 없어도 통과해
+    // 버려 아무것도 증명하지 못한다). 키보드로 누르기처럼 포인터를 거치지 않는
+    // 두 번째 동작은 흡수되지 않으므로, 버튼의 onPressed를 직접 두 번 부른다.
+    final onPressed = tester
+        .widget<FilledButton>(find.byKey(const Key('purchaseOrderButton')))
+        .onPressed!;
+    onPressed();
+    onPressed();
+    await tester.pumpAndSettle();
+
+    // 기본값(skipOffstage: true)이면 아래에 깔린 화면은 화면 밖으로 취급되어
+    // 둘을 쌓아도 하나로 센다.
+    expect(
+      find.byType(PurchaseOrderScreen, skipOffstage: false),
+      findsOneWidget,
+    );
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('발주서 화면에서 돌아오면 발주서 만들기 버튼이 다시 눌린다', (tester) async {
+    await addTrackedIngredient('양파', 5000);
+    await pumpOwnerWithStore(tester);
+
+    await tester.tap(find.byKey(const Key('purchaseOrderButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PurchaseOrderScreen), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(PurchaseOrderScreen, skipOffstage: false), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('purchaseOrderButton')))
+          .onPressed,
+      isNotNull,
+    );
+
+    await tester.tap(find.byKey(const Key('purchaseOrderButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PurchaseOrderScreen), findsOneWidget);
+
+    await disposeScreen(tester);
+  });
 }

@@ -265,13 +265,22 @@ class _ShortageCard extends ConsumerWidget {
 
 /// "발주서 만들기" 버튼. 발주서는 매장 하나 단위라서 사장이 전체 합산을
 /// 보는 중에는 누를 수 없다.
-class _PurchaseOrderBar extends ConsumerWidget {
+class _PurchaseOrderBar extends ConsumerStatefulWidget {
   const _PurchaseOrderBar({required this.shortages});
 
   final List<StockShortage> shortages;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PurchaseOrderBar> createState() => _PurchaseOrderBarState();
+}
+
+class _PurchaseOrderBarState extends ConsumerState<_PurchaseOrderBar> {
+  /// 발주서 화면이 열려 있는 동안 true. 두 번 눌러도 화면이 겹쳐 쌓이지 않게
+  /// 한다.
+  bool _opening = false;
+
+  @override
+  Widget build(BuildContext context) {
     final store = ref.watch(selectedStoreProvider);
 
     return Padding(
@@ -291,7 +300,9 @@ class _PurchaseOrderBar extends ConsumerWidget {
             const SizedBox(width: 12),
             FilledButton.icon(
               key: const Key('purchaseOrderButton'),
-              onPressed: store == null ? null : () => _open(context, store),
+              onPressed: (store == null || _opening)
+                  ? null
+                  : () => _open(context, store),
               icon: const Icon(Icons.description_outlined),
               label: const Text('발주서 만들기'),
             ),
@@ -303,17 +314,29 @@ class _PurchaseOrderBar extends ConsumerWidget {
 
   /// 누른 순간의 부족 목록을 복사해서 넘긴다. 발주서 화면이 부족 목록을 계속
   /// 지켜보면, 입력 중에 동기화로 재고가 바뀔 때 수량이 덮인다.
-  void _open(BuildContext context, Store store) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PurchaseOrderScreen(
-          store: store,
-          shortages: [
-            for (final shortage in shortages)
-              if (shortage.store.id == store.id) shortage,
-          ],
+  Future<void> _open(BuildContext context, Store store) async {
+    // 두 번째 누름이 화면이 다시 그려지기 전에 들어올 수 있어서(setState는
+    // 다음 프레임에야 반영된다) 먼저 동기적으로 막는다.
+    if (_opening) return;
+    _opening = true;
+    // 누르는 동안 버튼도 비활성으로 보이게 한다.
+    setState(() {});
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PurchaseOrderScreen(
+            store: store,
+            shortages: [
+              for (final shortage in widget.shortages)
+                if (shortage.store.id == store.id) shortage,
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      // 돌아오면 다시 누를 수 있다.
+      _opening = false;
+      if (mounted) setState(() {});
+    }
   }
 }
