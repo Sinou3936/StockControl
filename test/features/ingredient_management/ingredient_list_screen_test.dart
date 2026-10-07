@@ -213,6 +213,20 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('수정 다이얼로그에 0을 넣고 저장하면 추적이 해제되고 다이얼로그가 닫힌다', (tester) async {
+    final id = await addIngredient(safety: 5000);
+
+    await openSafetyStockDialog(tester);
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '0');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('safetyStockField')), findsNothing);
+    expect(await savedSafety(id), isNull);
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('수정 다이얼로그에 5000g를 넣으면 오류를 보이고 저장하지 않는다', (tester) async {
     final id = await addIngredient(safety: 5000);
 
