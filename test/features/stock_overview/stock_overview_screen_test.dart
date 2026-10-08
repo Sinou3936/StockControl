@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
+import 'package:stockcontrol/core/providers/stock_date_providers.dart';
 import 'package:stockcontrol/core/theme/app_theme.dart';
 import 'package:stockcontrol/data/local/database.dart';
+import 'package:stockcontrol/data/repositories/lot_repository.dart';
+import 'package:stockcontrol/domain/movement_type.dart';
+import 'package:stockcontrol/domain/stock_by_date.dart';
 import 'package:stockcontrol/features/stock_adjustment/stock_adjustment_form_screen.dart';
 import 'package:stockcontrol/features/stock_overview/stock_overview_screen.dart';
 
@@ -70,10 +74,17 @@ void main() {
         ),
       );
 
-  Future<void> pumpScreen(WidgetTester tester, AppDatabase db) async {
+  Future<void> pumpScreen(
+    WidgetTester tester,
+    AppDatabase db, {
+    DateTime? date,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          selectedStockDateProvider.overrideWith((ref) => date),
+        ],
         child: const MaterialApp(home: StockOverviewScreen()),
       ),
     );
@@ -269,5 +280,138 @@ void main() {
     expect(find.text('1,234.5g'), findsOneWidget);
 
     await disposeScreen(tester);
+  });
+
+  /// 이틀 전에 1,000g을 입고하고 오늘 400g을 폐기한다. 유통기한은 내일이라
+  /// 오늘 기준으로는 임박이다.
+  Future<void> seedPastDisposal(AppDatabase db) async {
+    final now = DateTime.now();
+    final twoDaysAgo = DateTime(now.year, now.month, now.day - 2, 9);
+    final id = await addIngredient(db, '양파');
+    final lotId = await LotRepository(db).receiveLot(
+      ingredientId: id,
+      receivedDate: twoDaysAgo,
+      expiryDate: now.add(const Duration(days: 1)),
+      unitCost: 1,
+      baseQty: 1000,
+    );
+    await LotRepository(db).recordQuantityChange(
+      lotId: lotId,
+      type: MovementType.disposal,
+      quantity: -400,
+    );
+  }
+
+  DateTime twoDaysAgoDate() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day - 2);
+  }
+
+  group('날짜별 조회', () {
+    testWidgets('오늘 화면은 지금 수량이고 날짜 버튼은 "오늘"이며 안내가 없다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedPastDisposal(db);
+
+      await pumpScreen(tester, db);
+
+      expect(find.text('600g'), findsOneWidget);
+      expect(find.text('오늘'), findsOneWidget);
+      expect(find.byKey(const Key('pastDateBanner')), findsNothing);
+      expect(find.byKey(const Key('summaryNearExpiryCount')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜는 그날 끝 기준 수량을 보인다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedPastDisposal(db);
+      final date = twoDaysAgoDate();
+
+      await pumpScreen(tester, db, date: date);
+
+      expect(find.text('1,000g'), findsOneWidget);
+      expect(find.text('600g'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stockDateButton')),
+          matching: find.text(stockDateLabel(date, now: DateTime.now())),
+        ),
+        findsOneWidget,
+      );
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜는 조회 전용이다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedPastDisposal(db);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      expect(find.textContaining('기준 (조회 전용)'), findsOneWidget);
+      expect(find.text('임박'), findsNothing);
+      expect(find.byKey(const Key('summaryNearExpiryCount')), findsNothing);
+      expect(find.byKey(const Key('summaryItemCount')), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
+
+      await tester.tap(find.text('1,000'));
+      await tester.pumpAndSettle();
+      expect(find.byType(StockAdjustmentFormScreen), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('"오늘로 돌아가기"를 누르면 오늘 화면이 된다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedPastDisposal(db);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+      expect(find.byKey(const Key('pastDateBanner')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('backToTodayButton')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byKey(const Key('pastDateBanner')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('stockDateButton')),
+          matching: find.text('오늘'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('600g'), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('날짜 버튼을 누르면 달력이 뜬다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      await pumpScreen(tester, db);
+      await tester.tap(find.byKey(const Key('stockDateButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜에 표시할 재고가 없으면 날짜가 들어간 빈 상태', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      expect(find.text('이 날에는 표시할 재고가 없습니다'), findsOneWidget);
+      expect(find.byKey(const Key('pastDateBanner')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
   });
 }

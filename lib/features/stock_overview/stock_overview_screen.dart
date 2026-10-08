@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
 import '../../core/providers/dao_providers.dart';
+import '../../core/providers/stock_date_providers.dart';
 import '../../core/providers/store_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
 import '../../data/local/database.dart';
+import '../../domain/stock_by_date.dart';
 import '../../domain/stock_overview.dart';
 import '../stock/store_switcher.dart';
 import '../stock_adjustment/stock_adjustment_form_screen.dart';
@@ -22,92 +24,203 @@ class StockOverviewScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dao = ref.watch(lotDaoProvider);
-    final storeId = ref.watch(activeStoreIdProvider);
+    final lotDao = ref.watch(lotDaoProvider);
+    final movementDao = ref.watch(stockMovementDaoProvider);
     final storeDao = ref.watch(storeDaoProvider);
+    final storeId = ref.watch(activeStoreIdProvider);
+    final selected = ref.watch(selectedStockDateProvider);
+    final now = DateTime.now();
+    final isToday = selected == null || isSameDay(selected, now);
+    // selected가 널이 아닐 때만 else 가지로 오므로 널 승격이 된다.
+    final day = selected == null || isSameDay(selected, now)
+        ? dayStart(now)
+        : selected;
+
+    // 오늘은 지금처럼 로트의 남은 수량, 지난 날짜는 그날 끝까지의 기록 합계.
+    final Stream<List<LotWithIngredient>> stockStream = isToday
+        ? lotDao.watchAvailableLotsWithIngredient(storeId: storeId)
+        : movementDao.watchStockAsOf(dayEnd(day), storeId: storeId);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('재고 조회'),
-        actions: const [StoreSwitcher()],
+        actions: [
+          TextButton.icon(
+            key: const Key('stockDateButton'),
+            icon: const Icon(Icons.calendar_today_outlined, size: 18),
+            label: Text(stockDateLabel(selected, now: now)),
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: day,
+                firstDate: DateTime(2020),
+                lastDate: dayStart(now),
+              );
+              if (picked == null) return;
+              ref.read(selectedStockDateProvider.notifier).state =
+                  stockDateSelection(picked, now: DateTime.now());
+            },
+          ),
+          const StoreSwitcher(),
+        ],
       ),
-      body: StreamBuilder<List<Store>>(
-        stream: storeDao.watchAll(),
-        builder: (context, storeSnapshot) {
-          final storeNames = {
-            for (final s in storeSnapshot.data ?? <Store>[]) s.id: s.name,
-          };
+      body: Column(
+        children: [
+          if (!isToday)
+            _PastDateBanner(
+              label: stockDateLabel(day, now: now),
+              onBack: () =>
+                  ref.read(selectedStockDateProvider.notifier).state = null,
+            ),
+          Expanded(
+            child: StreamBuilder<List<Store>>(
+              stream: storeDao.watchAll(),
+              builder: (context, storeSnapshot) {
+                final storeNames = {
+                  for (final s in storeSnapshot.data ?? <Store>[]) s.id: s.name,
+                };
+                return StreamBuilder<List<LotWithIngredient>>(
+                  stream: stockStream,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    return _StockBody(
+                      rows: snapshot.data!,
+                      storeNames: storeNames,
+                      now: now,
+                      isToday: isToday,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-          return StreamBuilder<List<LotWithIngredient>>(
-            stream: dao.watchAvailableLotsWithIngredient(storeId: storeId),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
+/// 지난 날짜를 보고 있다는 안내와 오늘로 돌아가는 버튼.
+class _PastDateBanner extends StatelessWidget {
+  const _PastDateBanner({required this.label, required this.onBack});
 
-              final now = DateTime.now();
-              final groups = groupLotsByIngredient(snapshot.data!, now: now);
-              if (groups.isEmpty) {
-                return const EmptyState(
-                  icon: Icons.inventory_2_outlined,
-                  title: '표시할 재고가 없습니다',
-                  message: '입고를 등록하면 여기에 나타납니다',
+  final String label;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return CenteredContent(
+      key: const Key('pastDateBanner'),
+      maxWidth: _kContentMaxWidth,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(_kPagePadding, 12, _kPagePadding, 0),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.chipBackground,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$label 기준 (조회 전용)',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textBody,
+                  ),
+                ),
+              ),
+              TextButton(
+                key: const Key('backToTodayButton'),
+                onPressed: onBack,
+                child: const Text('오늘로 돌아가기'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StockBody extends StatelessWidget {
+  const _StockBody({
+    required this.rows,
+    required this.storeNames,
+    required this.now,
+    required this.isToday,
+  });
+
+  final List<LotWithIngredient> rows;
+  final Map<String, String> storeNames;
+  final DateTime now;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = groupLotsByIngredient(
+      rows,
+      now: now,
+      flagNearExpiry: isToday,
+    );
+    if (groups.isEmpty) {
+      return EmptyState(
+        icon: Icons.inventory_2_outlined,
+        title: isToday ? '표시할 재고가 없습니다' : '이 날에는 표시할 재고가 없습니다',
+        message: isToday ? '입고를 등록하면 여기에 나타납니다' : null,
+      );
+    }
+
+    final nearExpiryLots = groups.fold<int>(
+      0,
+      (sum, g) =>
+          sum +
+          g.lots.where((l) => isNearExpiry(l.expiryDate, now: now)).length,
+    );
+
+    return CenteredContent(
+      maxWidth: _kContentMaxWidth,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = _columnsFor(constraints.maxWidth);
+          final rowCount = (groups.length / columns).ceil();
+
+          // 카드 줄 단위로 만들어 화면에 보이는 줄만 그린다.
+          return ListView.builder(
+            padding: const EdgeInsets.all(_kPagePadding),
+            itemCount: rowCount + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: _kGap),
+                  child: _SummaryStrip(
+                    itemCount: groups.length,
+                    nearExpiryCount: isToday ? nearExpiryLots : null,
+                  ),
                 );
               }
 
-              final nearExpiryLots = groups.fold<int>(
-                0,
-                (sum, g) =>
-                    sum +
-                    g.lots
-                        .where((l) => isNearExpiry(l.expiryDate, now: now))
-                        .length,
-              );
-
-              return CenteredContent(
-                maxWidth: _kContentMaxWidth,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final columns = _columnsFor(constraints.maxWidth);
-                    final rowCount = (groups.length / columns).ceil();
-
-                    // 카드 줄 단위로 만들어 화면에 보이는 줄만 그린다.
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(_kPagePadding),
-                      itemCount: rowCount + 1,
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: _kGap),
-                            child: _SummaryStrip(
-                              itemCount: groups.length,
-                              nearExpiryCount: nearExpiryLots,
-                            ),
-                          );
-                        }
-
-                        final start = (index - 1) * columns;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: _kGap),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              for (var i = 0; i < columns; i++) ...[
-                                if (i > 0) const SizedBox(width: _kGap),
-                                Expanded(
-                                  child: start + i < groups.length
-                                      ? _IngredientCard(
-                                          group: groups[start + i],
-                                          storeNames: storeNames,
-                                          now: now,
-                                        )
-                                      : const SizedBox.shrink(),
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+              final start = (index - 1) * columns;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: _kGap),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < columns; i++) ...[
+                      if (i > 0) const SizedBox(width: _kGap),
+                      Expanded(
+                        child: start + i < groups.length
+                            ? _IngredientCard(
+                                group: groups[start + i],
+                                storeNames: storeNames,
+                                now: now,
+                                readOnly: !isToday,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
                 ),
               );
             },
@@ -126,13 +239,17 @@ class StockOverviewScreen extends ConsumerWidget {
 }
 
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.itemCount, required this.nearExpiryCount});
+  const _SummaryStrip({required this.itemCount, this.nearExpiryCount});
 
   final int itemCount;
-  final int nearExpiryCount;
+
+  /// `null`이면 유통기한 임박 타일을 그리지 않는다 (지난 날짜 조회).
+  final int? nearExpiryCount;
 
   @override
   Widget build(BuildContext context) {
+    final near = nearExpiryCount;
+
     return Row(
       children: [
         Expanded(
@@ -143,16 +260,18 @@ class _SummaryStrip extends StatelessWidget {
             valueKey: const Key('summaryItemCount'),
           ),
         ),
-        const SizedBox(width: _kGap),
-        Expanded(
-          child: _StatTile(
-            label: '유통기한 임박',
-            value: '$nearExpiryCount',
-            unit: '건',
-            valueKey: const Key('summaryNearExpiryCount'),
-            alert: nearExpiryCount > 0,
+        if (near != null) ...[
+          const SizedBox(width: _kGap),
+          Expanded(
+            child: _StatTile(
+              label: '유통기한 임박',
+              value: '$near',
+              unit: '건',
+              valueKey: const Key('summaryNearExpiryCount'),
+              alert: near > 0,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -221,15 +340,19 @@ class _IngredientCard extends StatelessWidget {
     required this.group,
     required this.storeNames,
     required this.now,
+    this.readOnly = false,
   });
 
   final IngredientStockGroup group;
   final Map<String, String> storeNames;
   final DateTime now;
 
+  /// 지난 날짜 조회: 지금 기준의 경고와 탭 이동을 없앤다.
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) {
-    final alert = group.hasNearExpiryLot;
+    final alert = !readOnly && group.hasNearExpiryLot;
 
     // 테두리를 Container의 decoration에 맡기면 마지막 로트 줄의 불투명한 배경이
     // 아래쪽 두 모서리의 호 구간 테두리를 덮는다. Material의 shape는 테두리를
@@ -284,6 +407,7 @@ class _IngredientCard extends StatelessWidget {
               ingredient: group.ingredient,
               now: now,
               storeName: storeNames[lot.storeId],
+              readOnly: readOnly,
             ),
           ],
         ],
@@ -298,16 +422,18 @@ class _LotRow extends StatelessWidget {
     required this.ingredient,
     required this.now,
     this.storeName,
+    this.readOnly = false,
   });
 
   final Lot lot;
   final Ingredient ingredient;
   final DateTime now;
   final String? storeName;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
-    final near = isNearExpiry(lot.expiryDate, now: now);
+    final near = !readOnly && isNearExpiry(lot.expiryDate, now: now);
     final expiryText = lot.expiryDate == null
         ? '유통기한 관리 안 함'
         : '기한 ${lot.expiryDate!.toIso8601String().substring(0, 10)}';
@@ -315,12 +441,16 @@ class _LotRow extends StatelessWidget {
     return Material(
       color: near ? AppColors.dangerBackground : AppColors.surface,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) =>
-                StockAdjustmentFormScreen(lot: lot, ingredient: ingredient),
-          ),
-        ),
+        onTap: readOnly
+            ? null
+            : () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StockAdjustmentFormScreen(
+                    lot: lot,
+                    ingredient: ingredient,
+                  ),
+                ),
+              ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
           child: Row(
@@ -364,11 +494,12 @@ class _LotRow extends StatelessWidget {
                   fontFeatures: AppTheme.tabularFigures,
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: AppColors.textMuted,
-              ),
+              if (!readOnly)
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.textMuted,
+                ),
             ],
           ),
         ),
