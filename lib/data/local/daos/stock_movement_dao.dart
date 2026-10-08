@@ -66,10 +66,10 @@ class StockMovementDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  /// [dayStart] 이상 [dayEndExclusive] 미만에 기록된 입고(`inbound`). 수량은
+  /// [startInclusive] 이상 [dayEndExclusive] 미만에 기록된 입고(`inbound`). 수량은
   /// 입고 때의 값이다 — 그 뒤에 폐기·조정으로 줄어든 값이 아니다.
   Stream<List<InboundEntry>> watchInboundOn(
-    DateTime dayStart,
+    DateTime startInclusive,
     DateTime dayEndExclusive, {
     String? storeId,
   }) {
@@ -81,7 +81,7 @@ class StockMovementDao extends DatabaseAccessor<AppDatabase>
           leftOuterJoin(stores, stores.id.equalsExp(lots.storeId)),
         ])..where(
           stockMovements.type.equals(MovementType.inbound.toDbString()) &
-              stockMovements.occurredAt.isBiggerOrEqualValue(dayStart) &
+              stockMovements.occurredAt.isBiggerOrEqualValue(startInclusive) &
               stockMovements.occurredAt.isSmallerThanValue(dayEndExclusive),
         );
 

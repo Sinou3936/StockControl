@@ -160,6 +160,59 @@ void main() {
       expect(onlyA.map((r) => r.ingredient.name), ['양파']);
       expect(all, hasLength(2));
     });
+
+    test('유통기한이 이른 순서로 나오고 유통기한 없는 로트가 맨 앞이다', () async {
+      // 일부러 기대 순서와 다른 순서(10/20, 없음, 10/10)로 입고한다.
+      Future<void> receive(DateTime? expiry, double qty) => repo.receiveLot(
+        ingredientId: onionId,
+        receivedDate: DateTime(2026, 10, 5, 9),
+        expiryDate: expiry,
+        unitCost: 1,
+        baseQty: qty,
+      );
+      await receive(DateTime(2026, 10, 20), 3);
+      await receive(null, 1);
+      await receive(DateTime(2026, 10, 10), 2);
+
+      final rows = await stockAsOf(DateTime(2026, 10, 5));
+
+      expect(rows.map((r) => r.lot.expiryDate), [
+        null,
+        DateTime(2026, 10, 10),
+        DateTime(2026, 10, 20),
+      ]);
+    });
+
+    test('어느 로트와도 맞지 않는 매장을 고르면 빈 목록', () async {
+      await repo.receiveLot(
+        ingredientId: onionId,
+        receivedDate: DateTime(2026, 10, 5, 9),
+        unitCost: 1,
+        baseQty: 100,
+      );
+
+      expect(await stockAsOf(DateTime(2026, 10, 5), storeId: 'zzz'), isEmpty);
+    });
+
+    test('그날까지의 합계가 음수인 로트는 나오지 않는다', () async {
+      final lotId = await repo.receiveLot(
+        ingredientId: onionId,
+        receivedDate: DateTime(2026, 10, 6, 9),
+        unitCost: 1,
+        baseQty: 100,
+      );
+      // 입고(10/6)보다 앞선 날짜에 사용 기록이 있는 비정상 데이터.
+      await db.stockMovementDao.insertMovement(
+        StockMovementsCompanion.insert(
+          lotId: lotId,
+          type: MovementType.usage.toDbString(),
+          quantity: -150,
+          occurredAt: DateTime(2026, 10, 5, 9),
+        ),
+      );
+
+      expect(await stockAsOf(DateTime(2026, 10, 5)), isEmpty);
+    });
   });
 
   group('watchInboundOn', () {
@@ -279,6 +332,32 @@ void main() {
       final entries = await inboundOn(DateTime(2026, 10, 5));
 
       expect(entries.map((e) => e.ingredient.name), ['양파', '당근']);
+    });
+
+    test('매장이 없는 로트도 목록에서 빠지지 않고 storeName은 null', () async {
+      await repo.receiveLot(
+        ingredientId: onionId,
+        receivedDate: DateTime(2026, 10, 5, 9),
+        unitCost: 1,
+        baseQty: 100,
+      );
+
+      final entries = await inboundOn(DateTime(2026, 10, 5));
+
+      expect(entries, hasLength(1));
+      expect(entries.single.storeName, isNull);
+      expect(entries.single.ingredient.name, '양파');
+    });
+
+    test('어느 로트와도 맞지 않는 매장을 고르면 빈 목록', () async {
+      await repo.receiveLot(
+        ingredientId: onionId,
+        receivedDate: DateTime(2026, 10, 5, 9),
+        unitCost: 1,
+        baseQty: 100,
+      );
+
+      expect(await inboundOn(DateTime(2026, 10, 5), storeId: 'zzz'), isEmpty);
     });
   });
 }
