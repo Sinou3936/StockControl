@@ -364,6 +364,40 @@ void main() {
       await disposeScreen(tester);
     });
 
+    testWidgets('지난 날짜는 지금 기준 임박 품목을 앞으로 올리지 않는다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final now = DateTime.now();
+      final twoDaysAgo = DateTime(now.year, now.month, now.day - 2, 9);
+      final repo = LotRepository(db);
+      // 양파를 먼저 넣는다: 임박 우선이면 양파가 앞, 아니면 가나다순으로 당근이 앞.
+      final onion = await addIngredient(db, '양파');
+      final carrot = await addIngredient(db, '당근');
+      await repo.receiveLot(
+        ingredientId: onion,
+        receivedDate: twoDaysAgo,
+        expiryDate: now.add(const Duration(days: 1)),
+        unitCost: 1,
+        baseQty: 1000,
+      );
+      await repo.receiveLot(
+        ingredientId: carrot,
+        receivedDate: twoDaysAgo,
+        unitCost: 1,
+        baseQty: 500,
+      );
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      expect(
+        cardTopLeft(tester, carrot).dx,
+        lessThan(cardTopLeft(tester, onion).dx),
+      );
+
+      await disposeScreen(tester);
+    });
+
     testWidgets('"오늘로 돌아가기"를 누르면 오늘 화면이 된다', (tester) async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
