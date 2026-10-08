@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/data/local/database.dart';
+import 'package:stockcontrol/core/widgets/app_widgets.dart';
 import 'package:stockcontrol/features/ingredient_management/ingredient_list_screen.dart';
 
 void main() {
@@ -13,14 +14,14 @@ void main() {
   setUp(() => db = AppDatabase(NativeDatabase.memory()));
   tearDown(() => db.close());
 
-  Future<int> addIngredient({double? safety}) =>
+  Future<int> addIngredient({double? safety, bool expiry = false}) =>
       db.ingredientDao.insertIngredient(
         IngredientsCompanion.insert(
           name: '양파',
           baseUnit: 'g',
           purchaseUnit: '박스',
           conversionFactor: 20000,
-          isExpiryTracked: false,
+          isExpiryTracked: expiry,
           safetyStockQty: Value(safety),
         ),
       );
@@ -49,6 +50,67 @@ void main() {
     expect(find.text('안전재고 5,000g'), findsOneWidget);
 
     await disposeScreen(tester);
+  });
+
+  group('품목 카드의 칩', () {
+    testWidgets('안전재고와 유통기한 관리가 둘 다 해당하면 칩이 둘 다 보인다', (tester) async {
+      await addIngredient(safety: 5000, expiry: true);
+
+      await pumpScreen(tester);
+
+      expect(find.text('안전재고 5,000g'), findsOneWidget);
+      expect(find.text('유통기한 관리'), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('안전재고만 해당하면 안전재고 칩만 보인다', (tester) async {
+      await addIngredient(safety: 5000);
+
+      await pumpScreen(tester);
+
+      expect(find.text('안전재고 5,000g'), findsOneWidget);
+      expect(find.text('유통기한 관리'), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('유통기한 관리만 해당하면 그 칩만 보인다', (tester) async {
+      await addIngredient(expiry: true);
+
+      await pumpScreen(tester);
+
+      expect(find.text('유통기한 관리'), findsOneWidget);
+      expect(find.textContaining('안전재고'), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('둘 다 해당하지 않으면 칩이 없다', (tester) async {
+      await addIngredient();
+
+      await pumpScreen(tester);
+
+      expect(find.byType(InfoChip), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('좁은 폭에서 두 칩이 있어도 넘치지 않는다', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await addIngredient(safety: 5000, expiry: true);
+
+      await pumpScreen(tester);
+
+      expect(find.text('안전재고 5,000g'), findsOneWidget);
+      expect(find.text('유통기한 관리'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await disposeScreen(tester);
+    });
   });
 
   testWidgets('품목을 누르면 안전재고를 고칠 수 있다', (tester) async {

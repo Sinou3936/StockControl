@@ -51,12 +51,20 @@ class IngredientListScreen extends ConsumerWidget {
                       '${ingredient.purchaseUnit} = '
                       '${formatQty(ingredient.conversionFactor)}'
                       '${ingredient.baseUnit}',
-                  trailing: safety == null
-                      ? (ingredient.isExpiryTracked
-                            ? const InfoChip('유통기한 관리')
-                            : null)
-                      : InfoChip(
-                          '안전재고 ${formatQty(safety)}${ingredient.baseUnit}',
+                  trailing: (safety == null && !ingredient.isExpiryTracked)
+                      ? null
+                      : Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.end,
+                          children: [
+                            if (safety != null)
+                              InfoChip(
+                                '안전재고 ${formatQty(safety)}${ingredient.baseUnit}',
+                              ),
+                            if (ingredient.isExpiryTracked)
+                              const InfoChip('유통기한 관리'),
+                          ],
                         ),
                   onTap: () =>
                       _showSafetyStockDialog(context, dao, ingredient),
