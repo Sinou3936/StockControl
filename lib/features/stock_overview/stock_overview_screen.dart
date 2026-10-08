@@ -231,12 +231,15 @@ class _IngredientCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final alert = group.hasNearExpiryLot;
 
-    return Container(
+    // 테두리를 Container의 decoration에 맡기면 마지막 로트 줄의 불투명한 배경이
+    // 아래쪽 두 모서리의 호 구간 테두리를 덮는다. Material의 shape는 테두리를
+    // 자식 위에 그린다.
+    return Material(
       key: Key('ingredientCard_${group.ingredient.id}'),
+      color: AppColors.surface,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
           color: alert ? AppColors.dangerBorder : AppColors.border,
         ),
         borderRadius: BorderRadius.circular(12),

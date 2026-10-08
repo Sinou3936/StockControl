@@ -81,6 +81,11 @@ class MoreScreen extends ConsumerWidget {
 
 /// 메뉴 항목을 한 카드로 묶고 항목 사이에 가는 선을 넣는다. 물결 효과가 카드
 /// 안에서 보이도록 Material 위에 올린다.
+///
+/// 테두리를 Container의 decoration에 맡기지 않고 Material의 shape로 그린다.
+/// Container는 자식을 테두리 두께만큼 사각으로만 안쪽으로 밀어 넣어서, 불투명한
+/// 자식 배경이 둥근 모서리의 호 구간 테두리를 지운다. shape의 테두리는 자식
+/// 위에 그려져 모서리까지 이어진다.
 class _MenuGroup extends StatelessWidget {
   const _MenuGroup({required this.children});
 
@@ -88,23 +93,20 @@ class _MenuGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Material(
+      color: AppColors.surface,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: AppColors.border),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Material(
-        color: AppColors.surface,
-        child: Column(
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              if (i > 0) const Divider(height: 1, color: AppColors.border),
-              children[i],
-            ],
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.border),
+            children[i],
           ],
-        ),
+        ],
       ),
     );
   }
