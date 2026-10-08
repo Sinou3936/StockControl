@@ -31,9 +31,12 @@ class IngredientStockGroup {
       lots.fold(0.0, (sum, lot) => sum + lot.remainingQty);
 }
 
+/// [flagNearExpiry]가 false이면 임박 표시도 임박 우선 정렬도 하지 않는다
+/// (지난 날짜 조회는 지금 기준의 임박 표시와 정렬을 쓰지 않는다).
 List<IngredientStockGroup> groupLotsByIngredient(
   List<LotWithIngredient> rows, {
   required DateTime now,
+  bool flagNearExpiry = true,
 }) {
   final byIngredient = <int, List<LotWithIngredient>>{};
   for (final row in rows) {
@@ -46,6 +49,7 @@ List<IngredientStockGroup> groupLotsByIngredient(
       ingredient: groupRows.first.ingredient,
       lots: lots,
       hasNearExpiryLot:
+          flagNearExpiry &&
           lots.any((lot) => isNearExpiry(lot.expiryDate, now: now)),
     );
   }).toList();

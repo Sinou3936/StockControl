@@ -87,6 +87,30 @@ void _groupLotsByIngredientTests() {
 
       expect(groups.map((g) => g.ingredient.name), ['당근', '양파']);
     });
+
+    test('flagNearExpiry가 false이면 임박 표시도 정렬 우선도 없다', () {
+      final onion = _makeIngredient(1, '양파');
+      final carrot = _makeIngredient(2, '당근');
+      final rows = [
+        LotWithIngredient(
+          lot: _makeLot(1, 1, expiryDate: now.add(const Duration(days: 1))),
+          ingredient: onion,
+        ),
+        LotWithIngredient(lot: _makeLot(2, 2), ingredient: carrot),
+      ];
+
+      final flagged = groupLotsByIngredient(rows, now: now);
+      final unflagged = groupLotsByIngredient(
+        rows,
+        now: now,
+        flagNearExpiry: false,
+      );
+
+      // 켜면 임박한 양파가 먼저, 끄면 가나다순(당근, 양파)에 표시도 없다.
+      expect(flagged.map((g) => g.ingredient.name), ['양파', '당근']);
+      expect(unflagged.map((g) => g.ingredient.name), ['당근', '양파']);
+      expect(unflagged.every((g) => !g.hasNearExpiryLot), isTrue);
+    });
   });
 }
 
