@@ -215,6 +215,15 @@ class AppListCard extends StatelessWidget {
                 ),
               ),
               ?trailing,
+              // 눌리는 카드라는 단서. 재고 조회의 로트 줄(18)보다 제목이 커서 20.
+              if (onTap != null) ...[
+                if (trailing != null) const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppColors.textMuted,
+                ),
+              ],
             ],
           ),
         ),
