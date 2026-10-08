@@ -37,8 +37,14 @@ Future<CapturedPixels> capturePixels(
   );
   final pixels = await tester.runAsync(() async {
     final image = await boundary.toImage(pixelRatio: 1.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    return CapturedPixels(data!, image.width, image.height);
+    try {
+      // rawRgba는 알파가 미리 곱해진(premultiplied) 값이다. 우리가 읽는 점은
+      // 모두 불투명한 카드 위라서 알파가 1이므로 색이 달라지지 않는다.
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      return CapturedPixels(data!, image.width, image.height);
+    } finally {
+      image.dispose();
+    }
   });
   return pixels!;
 }

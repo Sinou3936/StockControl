@@ -153,6 +153,14 @@ class EmptyState extends StatelessWidget {
   }
 }
 
+/// [AppListCard]의 trailing이 차지할 수 있는 한 줄 폭의 최대 비율.
+///
+/// trailing은 Row 안에서 폭 제한 없이 배치되므로, 제한을 두지 않으면 칩이
+/// 여러 개일 때 Wrap이 줄바꿈하지 못하고 좁은 화면에서 넘친다. 고정 픽셀이
+/// 아니라 비율로 막아 넓은 카드에서는 칩이 한 줄에 놓이고, 좁은 화면에서는
+/// 제목이 절반 가까운 폭을 지키며 칩이 줄을 바꾼다.
+const _kTrailingMaxWidthFraction = 0.55;
+
 /// 목록 한 줄(거래처, 품목, 매장 등): 제목 + 보조 설명 + 오른쪽 위젯.
 class AppListCard extends StatelessWidget {
   const AppListCard({
@@ -187,44 +195,53 @@ class AppListCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textStrong,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        subtitle!,
+                        title,
                         style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textMuted,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textStrong,
                         ),
                       ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              ?trailing,
-              // 눌리는 카드라는 단서. 재고 조회의 로트 줄(18)보다 제목이 커서 20.
-              if (onTap != null) ...[
-                if (trailing != null) const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: AppColors.textMuted,
-                ),
+                if (trailing != null)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth:
+                          constraints.maxWidth * _kTrailingMaxWidthFraction,
+                    ),
+                    child: trailing,
+                  ),
+                // 눌리는 카드라는 단서. 재고 조회의 로트 줄(18)보다 제목이 커서 20.
+                if (onTap != null) ...[
+                  if (trailing != null) const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: AppColors.textMuted,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -96,18 +96,33 @@ void main() {
       await disposeScreen(tester);
     });
 
-    testWidgets('좁은 폭에서 두 칩이 있어도 넘치지 않는다', (tester) async {
-      tester.view.physicalSize = const Size(360, 800);
+    Future<void> pumpAtWidth(WidgetTester tester, double width) async {
+      tester.view.physicalSize = Size(width, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await addIngredient(safety: 5000, expiry: true);
-
       await pumpScreen(tester);
+    }
 
-      expect(find.text('안전재고 5,000g'), findsOneWidget);
-      expect(find.text('유통기한 관리'), findsOneWidget);
+    testWidgets('320px 폭에서는 두 칩이 두 줄로 나뉘고 넘치지 않는다', (tester) async {
+      await pumpAtWidth(tester, 320);
+
+      final safetyDy = tester.getTopLeft(find.text('안전재고 5,000g')).dy;
+      final expiryDy = tester.getTopLeft(find.text('유통기한 관리')).dy;
       expect(tester.takeException(), isNull);
+      expect(safetyDy, isNot(expiryDy));
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('1000px 폭에서는 두 칩이 한 줄에 놓인다', (tester) async {
+      await pumpAtWidth(tester, 1000);
+
+      final safetyDy = tester.getTopLeft(find.text('안전재고 5,000g')).dy;
+      final expiryDy = tester.getTopLeft(find.text('유통기한 관리')).dy;
+      expect(tester.takeException(), isNull);
+      expect(safetyDy, expiryDy);
 
       await disposeScreen(tester);
     });
