@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/supabase_config.dart';
+import 'core/l10n/app_locale.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/providers/sync_providers.dart';
 import 'core/shell/app_shell.dart';
@@ -63,6 +64,9 @@ class _StockControlAppState extends ConsumerState<StockControlApp> {
     return MaterialApp(
       title: '재고관리',
       theme: AppTheme.light(),
+      locale: appLocale,
+      supportedLocales: appSupportedLocales,
+      localizationsDelegates: appLocalizationsDelegates,
       home: session == null ? const LoginScreen() : const AppShell(),
     );
   }
