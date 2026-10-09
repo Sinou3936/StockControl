@@ -51,6 +51,8 @@ void main() {
       ),
     );
     await tester.pump();
+    // 재고 스트림의 값이 온 뒤에야 입고 스트림이 구독되므로 한 번 더 흘려보낸다.
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.textContaining('양파'), findsWidgets);
     expect(find.text('임박'), findsOneWidget);
@@ -362,7 +364,14 @@ void main() {
 
       await pumpScreen(tester, db, date: date);
 
-      expect(find.text('1,000g'), findsOneWidget);
+      // 같은 날 입고 카드에도 1,000g이 있으므로 품목 카드 안에서 본다.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('ingredientCard_1')),
+          matching: find.text('1,000g'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('600g'), findsNothing);
       expect(
         find.descendant(
@@ -440,6 +449,8 @@ void main() {
       await tester.tap(find.byKey(const Key('backToTodayButton')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
+      // 입고 스트림은 재고 스트림 다음에 구독되어 한 번 더 필요하다.
+      await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.byKey(const Key('pastDateBanner')), findsNothing);
       expect(
@@ -503,7 +514,13 @@ void main() {
       await seedPastDisposal(db);
 
       await pumpScreen(tester, db, date: twoDaysAgoDate());
-      expect(find.text('1,000g'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('ingredientCard_1')),
+          matching: find.text('1,000g'),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('backToTodayButton')));
       // 새 스트림의 값이 오기 전의 첫 프레임: 이전 모드의 값이 남아 있으면
@@ -512,6 +529,7 @@ void main() {
       expect(find.text('1,000g'), findsNothing);
       expect(find.text('1,000'), findsNothing);
 
+      await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.text('600g'), findsOneWidget);
 
@@ -616,8 +634,335 @@ void main() {
         date: twoDaysAgoDate(),
       );
 
-      expect(find.text('양파'), findsOneWidget);
-      expect(find.text('당근'), findsNothing);
+      // 입고 카드에도 같은 이름이 있으므로 품목 카드 키로 본다.
+      expect(find.byKey(Key('ingredientCard_$onion')), findsOneWidget);
+      expect(find.byKey(Key('ingredientCard_$carrot')), findsNothing);
+
+      await disposeScreen(tester);
+    });
+  });
+
+  group('이 날 입고 카드', () {
+    final inboundCard = find.byKey(const Key('inboundDayCard'));
+
+    Finder inCard(Finder matching) =>
+        find.descendant(of: inboundCard, matching: matching);
+
+    DateTime pastNoon(int daysAgo) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day - daysAgo, 12);
+    }
+
+    AuthSession staffOf(String storeId, String storeName) => AuthSession(
+      id: 'staff',
+      email: 'staff@internal.local',
+      pin: '111111',
+      displayName: '직원',
+      role: 'staff',
+      storeId: storeId,
+      storeName: storeName,
+    );
+
+    testWidgets('오늘 입고 두 건이 카드에 나온다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'a', name: '울산점'),
+      );
+      final supplierId = await db.supplierDao.insertSupplier(
+        SuppliersCompanion.insert(name: '가나다상사'),
+      );
+      final onion = await addIngredient(db, '양파');
+      final carrot = await addIngredient(db, '당근');
+      final repo = LotRepository(db);
+      await repo.receiveLot(
+        ingredientId: onion,
+        storeId: 'a',
+        supplierId: supplierId,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 1000,
+      );
+      await repo.receiveLot(
+        ingredientId: carrot,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 500,
+      );
+      final movements = await db.select(db.stockMovements).get();
+      expect(movements, hasLength(2));
+
+      await pumpScreen(tester, db);
+
+      expect(inboundCard, findsOneWidget);
+      expect(inCard(find.text('오늘 입고 2건')), findsOneWidget);
+      expect(inCard(find.text('양파')), findsOneWidget);
+      expect(inCard(find.text('1,000g')), findsOneWidget);
+      expect(inCard(find.text('울산점')), findsOneWidget);
+      expect(inCard(find.text('가나다상사')), findsOneWidget);
+      expect(inCard(find.text('당근')), findsOneWidget);
+      expect(inCard(find.text('500g')), findsOneWidget);
+      for (final m in movements) {
+        expect(find.byKey(Key('inboundEntry_${m.id}')), findsOneWidget);
+      }
+      // 입고 줄은 어느 날짜에서도 눌리지 않는다.
+      expect(inCard(find.byType(InkWell)), findsNothing);
+      expect(inCard(find.byIcon(Icons.chevron_right)), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('입고가 없으면 안내 문구가 나오고 재고 카드는 그대로 보인다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final id = await addIngredient(db, '양파');
+      // 기록 없이 로트만 넣어 재고는 있고 입고 기록은 없게 한다.
+      await db.lotDao.insertLot(
+        LotsCompanion.insert(
+          ingredientId: id,
+          receivedDate: DateTime.now(),
+          unitCost: 1,
+          remainingQty: 300,
+        ),
+      );
+
+      await pumpScreen(tester, db);
+
+      expect(inCard(find.text('오늘 입고 0건')), findsOneWidget);
+      expect(inCard(find.text('이 날 입고된 재고가 없습니다')), findsOneWidget);
+      expect(find.byKey(Key('ingredientCard_$id')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('오늘 입고한 뒤 오늘 폐기해도 입고 때 수량이 나온다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final id = await addIngredient(db, '양파');
+      final lotId = await LotRepository(db).receiveLot(
+        ingredientId: id,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 1000,
+      );
+      await LotRepository(db).recordQuantityChange(
+        lotId: lotId,
+        type: MovementType.disposal,
+        quantity: -400,
+      );
+
+      await pumpScreen(tester, db);
+
+      expect(inCard(find.text('1,000g')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(Key('ingredientCard_$id')),
+          matching: find.text('600g'),
+        ),
+        findsOneWidget,
+      );
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜는 그날 입고만 보인다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final onion = await addIngredient(db, '양파');
+      final carrot = await addIngredient(db, '당근');
+      final leek = await addIngredient(db, '대파');
+      final repo = LotRepository(db);
+      await repo.receiveLot(
+        ingredientId: onion,
+        receivedDate: pastNoon(2),
+        unitCost: 1,
+        baseQty: 100,
+      );
+      await repo.receiveLot(
+        ingredientId: carrot,
+        receivedDate: pastNoon(1),
+        unitCost: 1,
+        baseQty: 200,
+      );
+      await repo.receiveLot(
+        ingredientId: leek,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 300,
+      );
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+      expect(inCard(find.text('이 날 입고 1건')), findsOneWidget);
+      expect(inCard(find.text('양파')), findsOneWidget);
+      expect(inCard(find.text('당근')), findsNothing);
+      expect(inCard(find.text('대파')), findsNothing);
+      // 지난 날짜에서도 입고 줄은 눌리지 않는다.
+      expect(inCard(find.byType(InkWell)), findsNothing);
+      expect(inCard(find.byIcon(Icons.chevron_right)), findsNothing);
+
+      // 새 ProviderScope로 오늘 화면을 다시 올린다 (override 값이 확실히 바뀌게).
+      await disposeScreen(tester);
+      await pumpScreen(tester, db);
+      expect(inCard(find.text('오늘 입고 1건')), findsOneWidget);
+      expect(inCard(find.text('대파')), findsOneWidget);
+      expect(inCard(find.text('양파')), findsNothing);
+      expect(inCard(find.text('당근')), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('사용·폐기·조정은 입고 목록에 들어가지 않는다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final id = await addIngredient(db, '양파');
+      final repo = LotRepository(db);
+      final lotId = await repo.receiveLot(
+        ingredientId: id,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 1000,
+      );
+      for (final type in [
+        MovementType.usage,
+        MovementType.disposal,
+        MovementType.adjustment,
+        MovementType.countCorrection,
+      ]) {
+        await repo.recordQuantityChange(
+          lotId: lotId,
+          type: type,
+          quantity: -10,
+        );
+      }
+      expect(await db.select(db.stockMovements).get(), hasLength(5));
+
+      await pumpScreen(tester, db);
+
+      expect(inCard(find.text('오늘 입고 1건')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('그날 재고가 다 없어졌어도 입고 카드는 보인다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final id = await addIngredient(db, '양파');
+      final lotId = await LotRepository(db).receiveLot(
+        ingredientId: id,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 1000,
+      );
+      await LotRepository(db).recordQuantityChange(
+        lotId: lotId,
+        type: MovementType.disposal,
+        quantity: -1000,
+      );
+
+      await pumpScreen(tester, db);
+
+      expect(inCard(find.text('오늘 입고 1건')), findsOneWidget);
+      // 카드 아래 알림 한 줄이고, 화면 전체를 덮는 빈 상태가 아니다.
+      expect(find.text('표시할 재고가 없습니다'), findsOneWidget);
+      expect(find.byIcon(Icons.inventory_2_outlined), findsNothing);
+      expect(find.byKey(Key('ingredientCard_$id')), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('직원은 자기 매장의 입고만 카드에서 본다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'a', name: '울산점'),
+      );
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: '부산점'),
+      );
+      final onion = await addIngredient(db, '양파');
+      final carrot = await addIngredient(db, '당근');
+      final repo = LotRepository(db);
+      await repo.receiveLot(
+        ingredientId: onion,
+        storeId: 'a',
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 100,
+      );
+      await repo.receiveLot(
+        ingredientId: carrot,
+        storeId: 'b',
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 200,
+      );
+
+      await pumpAs(tester, db, session: staffOf('a', '울산점'));
+
+      expect(inCard(find.text('오늘 입고 1건')), findsOneWidget);
+      expect(inCard(find.text('양파')), findsOneWidget);
+      expect(inCard(find.text('당근')), findsNothing);
+      expect(inCard(find.text('부산점')), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('폭 320에서 긴 품목·매장·거래처 이름이 넘치지 않는다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      const longIngredient = '국내산 무항생제 친환경 유기농 양파 대용량 업소용 특품';
+      const longStore = '부산 해운대 센텀시티 지점';
+      const longSupplier = '대한민국 농협 경제지주 농산물 유통 부산 공판장 직거래';
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: longStore),
+      );
+      final supplierId = await db.supplierDao.insertSupplier(
+        SuppliersCompanion.insert(name: longSupplier),
+      );
+      final id = await addIngredient(db, longIngredient);
+      await LotRepository(db).receiveLot(
+        ingredientId: id,
+        storeId: 'b',
+        supplierId: supplierId,
+        receivedDate: DateTime.now(),
+        unitCost: 1,
+        baseQty: 123456,
+      );
+      await setWidth(tester, 320);
+
+      await pumpAs(
+        tester,
+        db,
+        session: AuthSession(
+          id: 'owner',
+          email: 'owner@internal.local',
+          pin: '123456',
+          displayName: '사장님',
+          role: 'owner',
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      // 품목명은 한 줄 말줄임.
+      final name = inCard(find.text(longIngredient));
+      expect(name, findsOneWidget);
+      expect(
+        tester.renderObject<RenderParagraph>(name).didExceedMaxLines,
+        isTrue,
+      );
+      // 수량 칸은 자기 글자 폭을 지킨다 (품목명에 밀려 줄바꿈되지 않는다).
+      final qty = inCard(find.text('123,456g'));
+      expect(qty, findsOneWidget);
+      final qtyParagraph = tester.renderObject<RenderParagraph>(qty);
+      expect(qtyParagraph.didExceedMaxLines, isFalse);
+      expect(
+        tester.getSize(qty).width,
+        greaterThanOrEqualTo(
+          qtyParagraph.getMaxIntrinsicWidth(double.infinity),
+        ),
+      );
+      expect(inCard(find.text(longStore)), findsOneWidget);
+      expect(inCard(find.text(longSupplier)), findsOneWidget);
 
       await disposeScreen(tester);
     });

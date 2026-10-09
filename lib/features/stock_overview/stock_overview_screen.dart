@@ -12,6 +12,7 @@ import '../../domain/stock_by_date.dart';
 import '../../domain/stock_overview.dart';
 import '../stock/store_switcher.dart';
 import '../stock_adjustment/stock_adjustment_form_screen.dart';
+import 'inbound_day_card.dart';
 
 const _kContentMaxWidth = 1100.0;
 const _kPagePadding = 16.0;
@@ -41,6 +42,12 @@ class StockOverviewScreen extends ConsumerWidget {
     final Stream<List<LotWithIngredient>> stockStream = isToday
         ? lotDao.watchAvailableLotsWithIngredient(storeId: storeId)
         : movementDao.watchStockAsOf(dayEnd(day), storeId: storeId);
+    // 그날(오늘 포함) 들어온 입고 기록. 입고 목록은 오늘에도 기록에서 읽는다.
+    final inboundStream = movementDao.watchInboundOn(
+      day,
+      dayEnd(day),
+      storeId: storeId,
+    );
 
     // 화면을 자정 넘어 켜 둬도 달력의 "오늘"이 따라가도록 누른 순간의 시각을 쓴다.
     Future<void> pickDate() async {
@@ -104,13 +111,23 @@ class StockOverviewScreen extends ConsumerWidget {
                   stream: stockStream,
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return const SizedBox.shrink();
-                    return _StockBody(
-                      rows: snapshot.data!,
-                      storeNames: storeNames,
-                      // 값이 올 때마다 지금 시각으로: 자정을 넘겨 켜 둔 화면의
-                      // 임박 판정이 어제 기준에 머물지 않게 (옛 코드와 같다).
-                      now: DateTime.now(),
-                      isToday: isToday,
+                    // 바깥 StreamBuilder의 key가 바뀌면 이 안쪽도 새로 만들어진다.
+                    return StreamBuilder<List<InboundEntry>>(
+                      stream: inboundStream,
+                      builder: (context, inboundSnapshot) {
+                        if (!inboundSnapshot.hasData) {
+                          return const SizedBox.shrink();
+                        }
+                        return _StockBody(
+                          rows: snapshot.data!,
+                          inbound: inboundSnapshot.data!,
+                          storeNames: storeNames,
+                          // 값이 올 때마다 지금 시각으로: 자정을 넘겨 켜 둔 화면의
+                          // 임박 판정이 어제 기준에 머물지 않게 (옛 코드와 같다).
+                          now: DateTime.now(),
+                          isToday: isToday,
+                        );
+                      },
                     );
                   },
                 );
@@ -170,12 +187,14 @@ class _PastDateBanner extends StatelessWidget {
 class _StockBody extends StatelessWidget {
   const _StockBody({
     required this.rows,
+    required this.inbound,
     required this.storeNames,
     required this.now,
     required this.isToday,
   });
 
   final List<LotWithIngredient> rows;
+  final List<InboundEntry> inbound;
   final Map<String, String> storeNames;
   final DateTime now;
   final bool isToday;
@@ -187,7 +206,8 @@ class _StockBody extends StatelessWidget {
       now: now,
       flagNearExpiry: isToday,
     );
-    if (groups.isEmpty) {
+    // 재고가 없어도 그날 들어온 입고가 있으면 입고 카드는 보여 준다.
+    if (groups.isEmpty && inbound.isEmpty) {
       return EmptyState(
         icon: Icons.inventory_2_outlined,
         title: isToday ? '표시할 재고가 없습니다' : '이 날에는 표시할 재고가 없습니다',
@@ -207,12 +227,14 @@ class _StockBody extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final columns = _columnsFor(constraints.maxWidth);
+          // 재고가 없고 입고만 있으면 0이다.
           final rowCount = (groups.length / columns).ceil();
 
           // 카드 줄 단위로 만들어 화면에 보이는 줄만 그린다.
+          // 0번 요약 줄, 1번 입고 카드, 그 뒤 재고 카드 줄.
           return ListView.builder(
             padding: const EdgeInsets.all(_kPagePadding),
-            itemCount: rowCount + 1,
+            itemCount: rowCount + 2,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return Padding(
@@ -223,8 +245,34 @@ class _StockBody extends StatelessWidget {
                   ),
                 );
               }
+              if (index == 1) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: _kGap),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      InboundDayCard(
+                        title: isToday ? '오늘 입고' : '이 날 입고',
+                        entries: inbound,
+                      ),
+                      if (groups.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: _kGap),
+                          child: Text(
+                            isToday ? '표시할 재고가 없습니다' : '이 날에는 표시할 재고가 없습니다',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }
 
-              final start = (index - 1) * columns;
+              final start = (index - 2) * columns;
               return Padding(
                 padding: const EdgeInsets.only(bottom: _kGap),
                 child: Row(
