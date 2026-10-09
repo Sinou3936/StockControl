@@ -13,6 +13,7 @@ import '../../domain/stock_overview.dart';
 import '../stock/store_switcher.dart';
 import '../stock_adjustment/stock_adjustment_form_screen.dart';
 import 'inbound_day_card.dart';
+import 'inbound_day_screen.dart';
 
 const _kContentMaxWidth = 1100.0;
 const _kPagePadding = 16.0;
@@ -126,6 +127,7 @@ class StockOverviewScreen extends ConsumerWidget {
                           // 임박 판정이 어제 기준에 머물지 않게 (옛 코드와 같다).
                           now: DateTime.now(),
                           isToday: isToday,
+                          day: day,
                         );
                       },
                     );
@@ -191,6 +193,7 @@ class _StockBody extends StatelessWidget {
     required this.storeNames,
     required this.now,
     required this.isToday,
+    required this.day,
   });
 
   final List<LotWithIngredient> rows;
@@ -198,6 +201,9 @@ class _StockBody extends StatelessWidget {
   final Map<String, String> storeNames;
   final DateTime now;
   final bool isToday;
+
+  /// 보고 있는 날짜 (오늘이면 오늘 00:00). 입고 전체 보기 화면에 넘긴다.
+  final DateTime day;
 
   @override
   Widget build(BuildContext context) {
@@ -254,6 +260,16 @@ class _StockBody extends StatelessWidget {
                       InboundDayCard(
                         title: isToday ? '오늘 입고' : '이 날 입고',
                         entries: inbound,
+                        onShowAll: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => InboundDayScreen(
+                              day: day,
+                              title: isToday
+                                  ? '오늘 입고'
+                                  : '${stockDateLabel(day, now: now)} 입고',
+                            ),
+                          ),
+                        ),
                       ),
                       if (groups.isEmpty)
                         Padding(

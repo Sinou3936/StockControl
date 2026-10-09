@@ -15,6 +15,7 @@ import 'package:stockcontrol/data/repositories/lot_repository.dart';
 import 'package:stockcontrol/domain/movement_type.dart';
 import 'package:stockcontrol/domain/stock_by_date.dart';
 import 'package:stockcontrol/features/stock_adjustment/stock_adjustment_form_screen.dart';
+import 'package:stockcontrol/features/stock_overview/inbound_day_card.dart';
 import 'package:stockcontrol/features/stock_overview/stock_overview_screen.dart';
 
 import '../../support/corner_pixels.dart';
@@ -1129,6 +1130,279 @@ void main() {
       );
       expect(inCard(find.text(longStore)), findsOneWidget);
       expect(inCard(find.text(longSupplier)), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+  });
+
+  group('이 날 입고 카드의 미리보기와 전체 보기', () {
+    final inboundCard = find.byKey(const Key('inboundDayCard'));
+    final showAll = find.byKey(const Key('inboundShowAll'));
+    final dayScreen = find.byKey(const Key('inboundDayScreen'));
+
+    Finder inCard(Finder matching) =>
+        find.descendant(of: inboundCard, matching: matching);
+    Finder onScreen(Finder matching) =>
+        find.descendant(of: dayScreen, matching: matching);
+    Finder appBarText(String text) =>
+        find.descendant(of: find.byType(AppBar), matching: find.text(text));
+
+    /// [daysAgo]일 전 [hour]시.
+    DateTime at(int daysAgo, int hour) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day - daysAgo, hour);
+    }
+
+    AuthSession ownerSession() => AuthSession(
+      id: 'owner',
+      email: 'owner@internal.local',
+      pin: '123456',
+      displayName: '사장님',
+      role: 'owner',
+    );
+
+    /// 입고 한 건을 넣고 그 입고 기록을 돌려준다.
+    Future<StockMovement> receive(
+      AppDatabase db,
+      String name,
+      DateTime when, {
+      String? storeId,
+      int? supplierId,
+    }) async {
+      final id = await addIngredient(db, name);
+      final lotId = await LotRepository(db).receiveLot(
+        ingredientId: id,
+        storeId: storeId,
+        supplierId: supplierId,
+        receivedDate: when,
+        unitCost: 1,
+        baseQty: 100,
+      );
+      final movements = await db.select(db.stockMovements).get();
+      return movements.firstWhere((m) => m.lotId == lotId);
+    }
+
+    /// 시각이 서로 다른 입고 [count]건. 이른 순서대로 돌려준다.
+    Future<List<StockMovement>> receiveMany(
+      AppDatabase db,
+      int count, {
+      int daysAgo = 0,
+      String? storeId,
+    }) async => [
+      for (var i = 0; i < count; i++)
+        await receive(db, '품목${i + 1}', at(daysAgo, 6 + i), storeId: storeId),
+    ];
+
+    Finder entry(StockMovement m) => find.byKey(Key('inboundEntry_${m.id}'));
+
+    testWidgets('입고가 세 건이면 전부 보이고 전체 보기 줄은 없다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final moves = await receiveMany(db, 3);
+
+      await pumpScreen(tester, db);
+
+      expect(inCard(find.text('오늘 입고 3건')), findsOneWidget);
+      for (final m in moves) {
+        expect(entry(m), findsOneWidget);
+      }
+      expect(showAll, findsNothing);
+      expect(inCard(find.byIcon(Icons.chevron_right)), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('입고가 네 건이면 앞 세 건만 보이고 전체 건수가 붙은 줄이 생긴다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      // 늦은 입고부터 넣어 id 순서와 시간 순서를 어긋나게 한다.
+      final late = await receive(db, '넷째', at(0, 9));
+      final third = await receive(db, '셋째', at(0, 8));
+      final first = await receive(db, '첫째', at(0, 6));
+      final second = await receive(db, '둘째', at(0, 7));
+
+      await pumpScreen(tester, db);
+
+      // 머리글은 전체 건수다 (미리보기 건수가 아니다).
+      expect(inCard(find.text('오늘 입고 4건')), findsOneWidget);
+      expect(entry(first), findsOneWidget);
+      expect(entry(second), findsOneWidget);
+      expect(entry(third), findsOneWidget);
+      expect(entry(late), findsNothing);
+      expect(inCard(find.text('넷째')), findsNothing);
+      expect(inCard(showAll), findsOneWidget);
+      expect(find.text('전체 4건 보기'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: showAll,
+          matching: find.byIcon(Icons.chevron_right),
+        ),
+        findsOneWidget,
+      );
+      // 전체 보기 줄은 마지막 줄 아래에 있다.
+      expect(
+        tester.getTopLeft(showAll).dy,
+        greaterThan(tester.getBottomLeft(entry(third)).dy - 1),
+      );
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('전체 보기를 누르면 그날 입고 전부가 새 화면에 나오고 뒤로 가면 돌아온다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final moves = await receiveMany(db, 4);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+      await tester.tap(showAll);
+      await tester.pumpAndSettle();
+
+      expect(dayScreen, findsOneWidget);
+      expect(appBarText('오늘 입고 4건'), findsOneWidget);
+      for (final m in moves) {
+        expect(onScreen(entry(m)), findsOneWidget);
+      }
+      // 줄은 눌리지 않는다: 눌림 효과도 화살표도 없다.
+      // (앱바의 뒤로 가기 단추에도 InkWell이 있어서 줄 안만 본다.)
+      final rows = onScreen(find.byType(InboundRow));
+      expect(rows, findsNWidgets(4));
+      expect(
+        find.descendant(of: rows, matching: find.byType(InkWell)),
+        findsNothing,
+      );
+      expect(onScreen(find.byIcon(Icons.chevron_right)), findsNothing);
+      // 이른 입고가 위에 있다.
+      expect(
+        tester.getTopLeft(entry(moves.first)).dy,
+        lessThan(tester.getTopLeft(entry(moves.last)).dy),
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(dayScreen, findsNothing);
+      expect(inboundCard, findsOneWidget);
+      expect(inCard(find.text('오늘 입고 4건')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜의 전체 보기 화면은 그날 입고만 그날 이름으로 보인다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final moves = await receiveMany(db, 4, daysAgo: 2);
+      final yesterday = await receive(db, '어제것', at(1, 12));
+      final today = await receive(db, '오늘것', at(0, 12));
+      await setWidth(tester, 800);
+      final label = stockDateLabel(twoDaysAgoDate(), now: DateTime.now());
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      expect(inCard(find.text('이 날 입고 4건')), findsOneWidget);
+      expect(find.text('전체 4건 보기'), findsOneWidget);
+
+      await tester.tap(showAll);
+      await tester.pumpAndSettle();
+
+      expect(appBarText('$label 입고 4건'), findsOneWidget);
+      for (final m in moves) {
+        expect(onScreen(entry(m)), findsOneWidget);
+      }
+      expect(onScreen(entry(yesterday)), findsNothing);
+      expect(onScreen(entry(today)), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('사장이 고른 매장의 입고만 전체 보기 화면에 나온다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'a', name: '울산점'),
+      );
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: '부산점'),
+      );
+      final ulsan = await receiveMany(db, 4, storeId: 'a');
+      final busan = await receive(db, '부산것', at(0, 12), storeId: 'b');
+      await setWidth(tester, 800);
+
+      await pumpAs(
+        tester,
+        db,
+        session: ownerSession(),
+        selectedStore: const Store(id: 'a', name: '울산점'),
+      );
+      expect(find.text('전체 4건 보기'), findsOneWidget);
+
+      await tester.tap(showAll);
+      await tester.pumpAndSettle();
+
+      expect(appBarText('오늘 입고 4건'), findsOneWidget);
+      for (final m in ulsan) {
+        expect(onScreen(entry(m)), findsOneWidget);
+      }
+      expect(onScreen(entry(busan)), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('전체 보기 화면이 열려 있는 동안 들어온 입고가 건수에 바로 반영된다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await receiveMany(db, 4);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+      await tester.tap(showAll);
+      await tester.pumpAndSettle();
+      expect(appBarText('오늘 입고 4건'), findsOneWidget);
+
+      final added = await receive(db, '새품목', at(0, 12));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(appBarText('오늘 입고 5건'), findsOneWidget);
+      expect(onScreen(entry(added)), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('폭 320에서 긴 이름이 전체 보기 화면에서도 넘치지 않는다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      const longIngredient = '국내산 무항생제 친환경 유기농 양파 대용량 업소용 특품';
+      const longStore = '부산 해운대 센텀시티 지점';
+      const longSupplier = '대한민국 농협 경제지주 농산물 유통 부산 공판장 직거래';
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: longStore),
+      );
+      final supplierId = await db.supplierDao.insertSupplier(
+        SuppliersCompanion.insert(name: longSupplier),
+      );
+      for (var i = 0; i < 4; i++) {
+        await receive(
+          db,
+          '$longIngredient$i',
+          at(0, 6 + i),
+          storeId: 'b',
+          supplierId: supplierId,
+        );
+      }
+      await setWidth(tester, 320);
+
+      await pumpAs(tester, db, session: ownerSession());
+      expect(tester.takeException(), isNull);
+      expect(find.text('전체 4건 보기'), findsOneWidget);
+
+      await tester.tap(showAll);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(appBarText('오늘 입고 4건'), findsOneWidget);
+      expect(onScreen(find.text(longStore)), findsWidgets);
+      expect(onScreen(find.text(longSupplier)), findsWidgets);
 
       await disposeScreen(tester);
     });
