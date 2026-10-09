@@ -16,12 +16,16 @@ class InboundDayCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.entries,
+    required this.emptyMessage,
     this.onShowAll,
   });
 
   /// "오늘 입고" 또는 "이 날 입고". 뒤에 건수가 붙는다.
   final String title;
   final List<InboundEntry> entries;
+
+  /// 입고가 한 건도 없을 때 보이는 문구 ("오늘 …" 또는 "이 날 …").
+  final String emptyMessage;
 
   /// "전체 N건 보기" 줄을 눌렀을 때. 입고가 미리보기 건수 이하면 그 줄이 없다.
   final VoidCallback? onShowAll;
@@ -53,11 +57,14 @@ class InboundDayCard extends StatelessWidget {
             ),
           ),
           if (entries.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Text(
-                '이 날 입고된 재고가 없습니다',
-                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                emptyMessage,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
               ),
             )
           else

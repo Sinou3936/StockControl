@@ -78,7 +78,7 @@ class StockOverviewScreen extends ConsumerWidget {
     final Widget dateButton = narrow
         ? IconButton(
             key: const Key('stockDateButton'),
-            tooltip: dateLabel,
+            tooltip: '날짜 선택 ($dateLabel)',
             icon: const Icon(Icons.calendar_today_outlined, size: 20),
             onPressed: pickDate,
           )
@@ -289,6 +289,9 @@ class _StockBodyState extends State<_StockBody> {
                       InboundDayCard(
                         title: isToday ? '오늘 입고' : '이 날 입고',
                         entries: inbound,
+                        emptyMessage: isToday
+                            ? '오늘 입고된 재고가 없습니다'
+                            : '이 날 입고된 재고가 없습니다',
                         onShowAll: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => InboundDayScreen(

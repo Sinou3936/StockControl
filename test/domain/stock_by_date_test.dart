@@ -24,6 +24,11 @@ void main() {
         isFalse,
       );
     });
+
+    test('isSameDay는 일이 같아도 달이나 해가 다르면 다른 날이다', () {
+      expect(isSameDay(DateTime(2026, 10, 5), DateTime(2026, 9, 5)), isFalse);
+      expect(isSameDay(DateTime(2026, 10, 5), DateTime(2025, 10, 5)), isFalse);
+    });
   });
 
   group('stockDateSelection', () {
@@ -38,6 +43,13 @@ void main() {
       expect(
         stockDateSelection(DateTime(2026, 10, 5, 13), now: now),
         DateTime(2026, 10, 5),
+      );
+    });
+
+    test('일만 같고 달이 다른 날은 오늘로 보지 않는다', () {
+      expect(
+        stockDateSelection(DateTime(2026, 9, 8), now: DateTime(2026, 10, 8)),
+        DateTime(2026, 9, 8),
       );
     });
   });

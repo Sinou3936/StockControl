@@ -480,6 +480,40 @@ void main() {
       await disposeScreen(tester);
     });
 
+    testWidgets('달력은 오늘까지만 고를 수 있다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+
+      await pumpScreen(tester, db);
+      await tester.tap(find.byKey(const Key('stockDateButton')));
+      await tester.pumpAndSettle();
+
+      final dialog = tester.widget<DatePickerDialog>(
+        find.byType(DatePickerDialog),
+      );
+      expect(dialog.lastDate, dayStart(DateTime.now()));
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('폭 360의 아이콘 날짜 버튼은 "날짜 선택" 툴팁이 있고 눌러 달력이 열린다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await setWidth(tester, 360);
+
+      await pumpScreen(tester, db);
+
+      final button = find.byTooltip('날짜 선택 (오늘)');
+      expect(button, findsOneWidget);
+      expect(find.byKey(const Key('stockDateButton')), findsOneWidget);
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
     testWidgets('지난 날짜에 표시할 재고가 없으면 날짜가 들어간 빈 상태', (tester) async {
       final db = AppDatabase(NativeDatabase.memory());
       addTearDown(db.close);
@@ -731,8 +765,39 @@ void main() {
       await pumpScreen(tester, db);
 
       expect(inCard(find.text('오늘 입고 0건')), findsOneWidget);
-      expect(inCard(find.text('이 날 입고된 재고가 없습니다')), findsOneWidget);
+      expect(inCard(find.text('오늘 입고된 재고가 없습니다')), findsOneWidget);
+      expect(find.text('이 날 입고된 재고가 없습니다'), findsNothing);
       expect(find.byKey(Key('ingredientCard_$id')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜에 입고가 없으면 "이 날" 문구가 나온다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final id = await addIngredient(db, '양파');
+      // 입고 기록 없이 로트만 넣어, 오늘 재고는 있지만 그날 입고는 없게 한다.
+      await db.lotDao.insertLot(
+        LotsCompanion.insert(
+          ingredientId: id,
+          receivedDate: DateTime.now(),
+          unitCost: 1,
+          remainingQty: 300,
+        ),
+      );
+      final other = await addIngredient(db, '당근');
+      await LotRepository(db).receiveLot(
+        ingredientId: other,
+        receivedDate: pastNoon(3),
+        unitCost: 1,
+        baseQty: 100,
+      );
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      expect(inCard(find.text('이 날 입고 0건')), findsOneWidget);
+      expect(inCard(find.text('이 날 입고된 재고가 없습니다')), findsOneWidget);
+      expect(find.text('오늘 입고된 재고가 없습니다'), findsNothing);
 
       await disposeScreen(tester);
     });
