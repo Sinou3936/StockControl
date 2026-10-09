@@ -21,6 +21,10 @@ const _kGap = 12.0;
 const _kMinCardWidth = 220.0;
 const _kMaxColumns = 4;
 
+/// 접힌 품목 카드가 미리 보여 주는 로트 줄 수. 로트가 이보다 많으면 나머지를
+/// 접고 "나머지 N개 보기" 줄을 둔다 (임박 로트는 이 수 밖이어도 보인다).
+const _kLotPreviewCount = 3;
+
 /// 이 폭보다 좁으면 앱바의 날짜 버튼이 아이콘만 남는다.
 const _kNarrowWidth = 600.0;
 
@@ -186,7 +190,7 @@ class _PastDateBanner extends StatelessWidget {
   }
 }
 
-class _StockBody extends StatelessWidget {
+class _StockBody extends StatefulWidget {
   const _StockBody({
     required this.rows,
     required this.inbound,
@@ -206,7 +210,32 @@ class _StockBody extends StatelessWidget {
   final DateTime day;
 
   @override
+  State<_StockBody> createState() => _StockBodyState();
+}
+
+class _StockBodyState extends State<_StockBody> {
+  /// 로트 목록을 펼친 품목의 id. 카드 안에 두면 ListView.builder가 화면 밖
+  /// 카드를 버릴 때 같이 사라지므로 여기서 들고 있는다. 날짜가 바뀌면 바깥
+  /// StreamBuilder가 새로 만들어져 이 상태도 비워진다.
+  final Set<int> _expandedIngredientIds = {};
+
+  void _toggle(int ingredientId) {
+    setState(() {
+      if (!_expandedIngredientIds.remove(ingredientId)) {
+        _expandedIngredientIds.add(ingredientId);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final rows = widget.rows;
+    final inbound = widget.inbound;
+    final storeNames = widget.storeNames;
+    final now = widget.now;
+    final isToday = widget.isToday;
+    final day = widget.day;
+
     final groups = groupLotsByIngredient(
       rows,
       now: now,
@@ -303,6 +332,11 @@ class _StockBody extends StatelessWidget {
                                 storeNames: storeNames,
                                 now: now,
                                 readOnly: !isToday,
+                                expanded: _expandedIngredientIds.contains(
+                                  groups[start + i].ingredient.id,
+                                ),
+                                onToggleExpanded: () =>
+                                    _toggle(groups[start + i].ingredient.id),
                               )
                             : const SizedBox.shrink(),
                       ),
@@ -427,6 +461,8 @@ class _IngredientCard extends StatelessWidget {
     required this.group,
     required this.storeNames,
     required this.now,
+    required this.expanded,
+    required this.onToggleExpanded,
     this.readOnly = false,
   });
 
@@ -434,12 +470,29 @@ class _IngredientCard extends StatelessWidget {
   final Map<String, String> storeNames;
   final DateTime now;
 
+  /// 로트 목록을 전부 펼쳤는지. 로트가 [_kLotPreviewCount]개 이하면 쓰이지 않는다.
+  final bool expanded;
+  final VoidCallback onToggleExpanded;
+
   /// 지난 날짜 조회: 지금 기준의 경고와 탭 이동을 없앤다.
   final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
     final alert = group.hasNearExpiryLot;
+
+    // 접힌 카드는 앞 [_kLotPreviewCount]개와, 그 밖이라도 임박 로트를 보인다
+    // (임박 로트는 숨기지 않는다). 보이는 줄은 원래 순서를 지킨다. 머리글 합계와
+    // 테두리는 보이는 줄이 아니라 group 전체(모든 로트)가 기준이다.
+    final lots = group.lots;
+    final collapsedLots = [
+      for (var i = 0; i < lots.length; i++)
+        if (i < _kLotPreviewCount ||
+            (!readOnly && isNearExpiry(lots[i].expiryDate, now: now)))
+          lots[i],
+    ];
+    final hiddenCount = lots.length - collapsedLots.length;
+    final visibleLots = expanded ? lots : collapsedLots;
 
     // 테두리를 Container의 decoration에 맡기면 마지막 로트 줄의 불투명한 배경이
     // 아래쪽 두 모서리의 호 구간 테두리를 덮는다. Material의 shape는 테두리를
@@ -487,14 +540,46 @@ class _IngredientCard extends StatelessWidget {
               ],
             ),
           ),
-          for (final lot in group.lots) ...[
+          for (final lot in visibleLots) ...[
             const Divider(height: 1, thickness: 1, color: AppColors.border),
             _LotRow(
+              key: Key('lotRow_${lot.id}'),
               lot: lot,
               ingredient: group.ingredient,
               now: now,
               storeName: storeNames[lot.storeId],
               readOnly: readOnly,
+            ),
+          ],
+          // 접었을 때 숨길 로트가 없으면 펼칠 것도 없으니 줄을 두지 않는다.
+          // 지난 날짜에서도 줄은 눌린다 (화면 이동이 아니라 보기 방식이다).
+          if (hiddenCount > 0) ...[
+            const Divider(height: 1, thickness: 1, color: AppColors.border),
+            InkWell(
+              key: Key('lotToggle_${group.ingredient.id}'),
+              onTap: onToggleExpanded,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        expanded ? '접기' : '나머지 $hiddenCount개 보기',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ],
@@ -505,6 +590,7 @@ class _IngredientCard extends StatelessWidget {
 
 class _LotRow extends StatelessWidget {
   const _LotRow({
+    super.key,
     required this.lot,
     required this.ingredient,
     required this.now,

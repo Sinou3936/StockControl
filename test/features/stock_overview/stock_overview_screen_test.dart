@@ -1408,6 +1408,389 @@ void main() {
     });
   });
 
+  group('재고 카드의 로트 접기', () {
+    DateTime inDays(int days) => DateTime.now().add(Duration(days: days));
+
+    Future<int> addLot(
+      AppDatabase db,
+      int ingredientId, {
+      DateTime? expiry,
+      required double qty,
+      String? storeId,
+    }) => db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: ingredientId,
+        storeId: Value(storeId),
+        receivedDate: DateTime.now(),
+        expiryDate: Value(expiry),
+        unitCost: 10,
+        remainingQty: qty,
+      ),
+    );
+
+    /// 임박하지 않고 유통기한이 서로 다른 로트 [count]개. 기한이 늦을수록 아래에
+    /// 오고 수량은 100, 200, ... 이라 id 순서가 곧 화면 순서다.
+    Future<List<int>> farLots(
+      AppDatabase db,
+      int ingredientId,
+      int count,
+    ) async => [
+      for (var i = 0; i < count; i++)
+        await addLot(
+          db,
+          ingredientId,
+          expiry: inDays(10 + i),
+          qty: 100.0 * (i + 1),
+        ),
+    ];
+
+    Finder card(int ingredientId) =>
+        find.byKey(Key('ingredientCard_$ingredientId'));
+    Finder toggle(int ingredientId) =>
+        find.byKey(Key('lotToggle_$ingredientId'));
+    Finder row(int lotId) => find.byKey(Key('lotRow_$lotId'));
+    Finder rowsIn(int ingredientId) => find.descendant(
+      of: card(ingredientId),
+      matching: find.byWidgetPredicate((w) {
+        final key = w.key;
+        return key is ValueKey<String> && key.value.startsWith('lotRow_');
+      }),
+    );
+    Finder inIngredientCard(int ingredientId, Finder matching) =>
+        find.descendant(of: card(ingredientId), matching: matching);
+
+    Future<AppDatabase> newDb() async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      return db;
+    }
+
+    Future<void> tapToggle(WidgetTester tester, int ingredientId) async {
+      await tester.tap(toggle(ingredientId));
+      await tester.pump();
+    }
+
+    AuthSession ownerSession() => AuthSession(
+      id: 'owner',
+      email: 'owner@internal.local',
+      pin: '123456',
+      displayName: '사장님',
+      role: 'owner',
+    );
+
+    testWidgets('로트가 세 개이면 전부 보이고 접기 줄은 없다', (tester) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      final lots = await farLots(db, id, 3);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+
+      expect(rowsIn(id), findsNWidgets(3));
+      for (final lotId in lots) {
+        expect(row(lotId), findsOneWidget);
+      }
+      expect(toggle(id), findsNothing);
+      expect(find.byIcon(Icons.expand_more), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('로트가 다섯 개이면 앞 세 개만 보이고 숨은 개수가 붙은 줄이 생긴다', (tester) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      final lots = await farLots(db, id, 5);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+
+      expect(rowsIn(id), findsNWidgets(3));
+      for (final lotId in lots.take(3)) {
+        expect(row(lotId), findsOneWidget);
+      }
+      expect(row(lots[3]), findsNothing);
+      expect(row(lots[4]), findsNothing);
+      expect(inIngredientCard(id, find.text('나머지 2개 보기')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: toggle(id),
+          matching: find.byIcon(Icons.expand_more),
+        ),
+        findsOneWidget,
+      );
+      // 머리글 합계는 숨은 로트까지 합한 값이다: 100+200+300+400+500.
+      expect(inIngredientCard(id, find.text('1,500g')), findsOneWidget);
+      // 접기 줄은 마지막으로 보이는 로트 줄 아래에 있다.
+      expect(
+        tester.getTopLeft(toggle(id)).dy,
+        greaterThan(tester.getBottomLeft(row(lots[2])).dy - 1),
+      );
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('줄을 누르면 전부 펼쳐지고 다시 누르면 접힌다', (tester) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      final lots = await farLots(db, id, 5);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+      await tapToggle(tester, id);
+
+      expect(rowsIn(id), findsNWidgets(5));
+      for (final lotId in lots) {
+        expect(row(lotId), findsOneWidget);
+      }
+      expect(inIngredientCard(id, find.text('접기')), findsOneWidget);
+      expect(inIngredientCard(id, find.textContaining('나머지')), findsNothing);
+      expect(
+        find.descendant(
+          of: toggle(id),
+          matching: find.byIcon(Icons.expand_less),
+        ),
+        findsOneWidget,
+      );
+      expect(inIngredientCard(id, find.text('1,500g')), findsOneWidget);
+
+      await tapToggle(tester, id);
+
+      expect(rowsIn(id), findsNWidgets(3));
+      expect(row(lots[3]), findsNothing);
+      expect(inIngredientCard(id, find.text('나머지 2개 보기')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('앞 세 개 밖의 임박 로트는 접혀 있어도 보이고, 숨은 개수에 들지 않는다', (tester) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      // 유통기한 없는 로트가 앞에 오고(널이 먼저 정렬된다) 임박 로트는 네 번째가 된다.
+      final n1 = await addLot(db, id, qty: 10);
+      final n2 = await addLot(db, id, qty: 20);
+      final n3 = await addLot(db, id, qty: 30);
+      final near = await addLot(db, id, expiry: inDays(1), qty: 40);
+      final far = await addLot(db, id, expiry: inDays(30), qty: 50);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+
+      expect(rowsIn(id), findsNWidgets(4));
+      for (final lotId in [n1, n2, n3, near]) {
+        expect(row(lotId), findsOneWidget);
+      }
+      expect(row(far), findsNothing);
+      // 보이는 줄은 원래 순서를 지킨다: 임박 로트가 앞 세 줄 아래에.
+      expect(
+        tester.getTopLeft(row(near)).dy,
+        greaterThan(tester.getTopLeft(row(n3)).dy),
+      );
+      expect(
+        inIngredientCard(
+          id,
+          find.descendant(of: row(near), matching: find.text('임박')),
+        ),
+        findsOneWidget,
+      );
+      // 숨은 것은 기한이 먼 로트 하나뿐이다 (전체 5개 - 보이는 4개).
+      expect(inIngredientCard(id, find.text('나머지 1개 보기')), findsOneWidget);
+      // 머리글 합계와 위험 테두리는 숨은 로트까지 모두 기준이다.
+      expect(inIngredientCard(id, find.text('150g')), findsOneWidget);
+      final shape =
+          tester.widget<Material>(card(id)).shape! as RoundedRectangleBorder;
+      expect(shape.side.color, AppColors.dangerBorder);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('앞 세 개 밖에 임박 로트 하나만 있으면 숨은 로트가 없어 줄이 없다', (tester) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      final lots = [
+        await addLot(db, id, qty: 10),
+        await addLot(db, id, qty: 20),
+        await addLot(db, id, qty: 30),
+        await addLot(db, id, expiry: inDays(1), qty: 40),
+      ];
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+
+      expect(rowsIn(id), findsNWidgets(4));
+      for (final lotId in lots) {
+        expect(row(lotId), findsOneWidget);
+      }
+      expect(toggle(id), findsNothing);
+      expect(inIngredientCard(id, find.textContaining('나머지')), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('한 품목을 펼쳐도 다른 품목은 접힌 채다', (tester) async {
+      final db = await newDb();
+      final first = await addIngredient(db, '가지');
+      final second = await addIngredient(db, '당근');
+      await farLots(db, first, 5);
+      await farLots(db, second, 5);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+      expect(rowsIn(first), findsNWidgets(3));
+      expect(rowsIn(second), findsNWidgets(3));
+
+      await tapToggle(tester, first);
+
+      expect(rowsIn(first), findsNWidgets(5));
+      expect(inIngredientCard(first, find.text('접기')), findsOneWidget);
+      expect(rowsIn(second), findsNWidgets(3));
+      expect(inIngredientCard(second, find.text('나머지 2개 보기')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('펼친 카드는 새 재고가 들어와 다시 그려져도 펼쳐진 채다', (tester) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      await farLots(db, id, 5);
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+      await tapToggle(tester, id);
+      expect(rowsIn(id), findsNWidgets(5));
+
+      final added = await addLot(db, id, expiry: inDays(40), qty: 600);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(rowsIn(id), findsNWidgets(6));
+      expect(row(added), findsOneWidget);
+      expect(inIngredientCard(id, find.text('접기')), findsOneWidget);
+      expect(inIngredientCard(id, find.text('2,100g')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('펼친 카드는 화면 밖으로 스크롤됐다 돌아와도 펼쳐진 채다', (tester) async {
+      final db = await newDb();
+      final ids = <int>[];
+      for (var i = 1; i <= 12; i++) {
+        final id = await addIngredient(db, '품목${i.toString().padLeft(2, '0')}');
+        ids.add(id);
+        await farLots(db, id, 5);
+      }
+      await setWidth(tester, 390);
+
+      await pumpScreen(tester, db);
+      await tapToggle(tester, ids.first);
+      expect(rowsIn(ids.first), findsNWidgets(5));
+      // 누른 InkWell은 물결 효과가 끝날 때까지 자기 줄을 화면 밖에서도 붙잡아 둔다
+      // (AutomaticKeepAlive). 끝나게 둬야 카드가 정말로 버려진다.
+      await tester.pumpAndSettle();
+
+      // ListView.builder는 화면 밖 카드를 버린다.
+      await tester.drag(find.byType(ListView), const Offset(0, -6000));
+      await tester.pump();
+      expect(card(ids.first), findsNothing);
+
+      await tester.drag(find.byType(ListView), const Offset(0, 6000));
+      await tester.pump();
+      expect(card(ids.first), findsOneWidget);
+      expect(rowsIn(ids.first), findsNWidgets(5));
+      expect(inIngredientCard(ids.first, find.text('접기')), findsOneWidget);
+      // 눌러 보지 않은 카드는 접힌 채다.
+      expect(rowsIn(ids[1]), findsNWidgets(3));
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜에서도 줄이 동작하고, 임박 예외 없이 앞 세 개만 보이며 줄은 여전히 안 눌린다', (
+      tester,
+    ) async {
+      final db = await newDb();
+      final id = await addIngredient(db, '양파');
+      final repo = LotRepository(db);
+      final received = twoDaysAgoDate().add(const Duration(hours: 9));
+      Future<int> receive(DateTime? expiry, double qty) => repo.receiveLot(
+        ingredientId: id,
+        receivedDate: received,
+        expiryDate: expiry,
+        unitCost: 1,
+        baseQty: qty,
+      );
+      // 지금 기준으로는 네 번째 로트가 임박이지만 지난 날짜는 임박을 쓰지 않는다.
+      final lots = [
+        await receive(null, 10),
+        await receive(null, 20),
+        await receive(null, 30),
+        await receive(inDays(1), 40),
+        await receive(inDays(30), 50),
+      ];
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      expect(rowsIn(id), findsNWidgets(3));
+      expect(row(lots[3]), findsNothing);
+      expect(inIngredientCard(id, find.text('나머지 2개 보기')), findsOneWidget);
+      expect(inIngredientCard(id, find.text('150g')), findsOneWidget);
+
+      await tapToggle(tester, id);
+
+      expect(rowsIn(id), findsNWidgets(5));
+      expect(inIngredientCard(id, find.text('접기')), findsOneWidget);
+      expect(find.text('임박'), findsNothing);
+      // (입고 카드의 "전체 보기" 줄에는 화살표가 있어 품목 카드 안에서만 본다.)
+      expect(
+        inIngredientCard(id, find.byIcon(Icons.chevron_right)),
+        findsNothing,
+      );
+
+      await tester.tap(row(lots[0]));
+      await tester.pumpAndSettle();
+      expect(find.byType(StockAdjustmentFormScreen), findsNothing);
+
+      await tapToggle(tester, id);
+      expect(rowsIn(id), findsNWidgets(3));
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('폭 320에서 긴 품목·매장 이름이 접힌 카드와 펼친 카드 모두 넘치지 않는다', (tester) async {
+      final db = await newDb();
+      const longIngredient = '국내산 무항생제 친환경 유기농 양파 대용량 업소용 특품';
+      const longStore = '부산 해운대 센텀시티 지점';
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: longStore),
+      );
+      final id = await addIngredient(db, longIngredient);
+      for (var i = 0; i < 5; i++) {
+        await addLot(
+          db,
+          id,
+          expiry: inDays(10 + i),
+          qty: 123456.0 + i,
+          storeId: 'b',
+        );
+      }
+      await setWidth(tester, 320);
+
+      await pumpAs(tester, db, session: ownerSession());
+
+      expect(tester.takeException(), isNull);
+      expect(rowsIn(id), findsNWidgets(3));
+      expect(inIngredientCard(id, find.text('나머지 2개 보기')), findsOneWidget);
+
+      await tapToggle(tester, id);
+
+      expect(tester.takeException(), isNull);
+      expect(rowsIn(id), findsNWidgets(5));
+      expect(inIngredientCard(id, find.text('접기')), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+  });
+
   group('좁은 화면의 앱바', () {
     const longStoreName = '부산 해운대 센텀시티 지점';
 
