@@ -1,10 +1,13 @@
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:stockcontrol/core/providers/auth_providers.dart';
 import 'package:stockcontrol/core/providers/database_provider.dart';
 import 'package:stockcontrol/core/providers/stock_date_providers.dart';
+import 'package:stockcontrol/core/providers/store_providers.dart';
 import 'package:stockcontrol/core/theme/app_theme.dart';
 import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/data/repositories/lot_repository.dart';
@@ -86,6 +89,34 @@ void main() {
           selectedStockDateProvider.overrideWith((ref) => date),
         ],
         child: const MaterialApp(home: StockOverviewScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  /// 세션·선택 매장·실제 앱 테마를 갖춘 화면 (사장/직원 시나리오용).
+  Future<void> pumpAs(
+    WidgetTester tester,
+    AppDatabase db, {
+    required AuthSession session,
+    DateTime? date,
+    Store? selectedStore,
+  }) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          selectedStockDateProvider.overrideWith((ref) => date),
+          authSessionProvider.overrideWith(
+            (ref) => AuthSessionNotifier()..setSession(session),
+          ),
+          selectedStoreProvider.overrideWith((ref) => selectedStore),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const StockOverviewScreen(),
+        ),
       ),
     );
     await tester.pump();
@@ -444,6 +475,259 @@ void main() {
 
       expect(find.text('이 날에는 표시할 재고가 없습니다'), findsOneWidget);
       expect(find.byKey(const Key('pastDateBanner')), findsOneWidget);
+      // 오늘용 안내("입고를 등록하면 …")는 지난 날짜에 어울리지 않는다.
+      expect(find.textContaining('입고를 등록하면'), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜의 카드는 임박 로트가 있어도 위험 테두리가 없다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedPastDisposal(db);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+
+      final card = tester.widget<Material>(
+        find.byKey(const Key('ingredientCard_1')),
+      );
+      final shape = card.shape! as RoundedRectangleBorder;
+      expect(shape.side.color, AppColors.border);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜에서 오늘로 돌아온 첫 프레임에 지난 수량이 나오지 않는다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedPastDisposal(db);
+
+      await pumpScreen(tester, db, date: twoDaysAgoDate());
+      expect(find.text('1,000g'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('backToTodayButton')));
+      // 새 스트림의 값이 오기 전의 첫 프레임: 이전 모드의 값이 남아 있으면
+      // 지난 합계(1,000)가 탭 가능한 오늘 모드로 그려진다.
+      await tester.pump();
+      expect(find.text('1,000g'), findsNothing);
+      expect(find.text('1,000'), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('600g'), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('저장된 날짜가 미래여도 달력이 오류 없이 열린다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+
+      await pumpScreen(tester, db, date: tomorrow);
+      await tester.tap(find.byKey(const Key('stockDateButton')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('달력에서 날짜를 고르면 그 날짜 기준 화면으로 바뀐다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final id = await addIngredient(db, '양파');
+      final lotId = await LotRepository(db).receiveLot(
+        ingredientId: id,
+        receivedDate: DateTime(2025, 12, 30, 9),
+        unitCost: 1,
+        baseQty: 1000,
+      );
+      await LotRepository(db).recordQuantityChange(
+        lotId: lotId,
+        type: MovementType.disposal,
+        quantity: -400,
+      );
+      await setWidth(tester, 800);
+
+      await pumpScreen(tester, db);
+      expect(find.text('600g'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('stockDateButton')));
+      await tester.pumpAndSettle();
+      // 달력 칸을 누르면 달·월 경계에 따라 깨지므로 입력 모드로 바꿔 날짜를 쓴다.
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '12/31/2025');
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(StockOverviewScreen)),
+      );
+      expect(container.read(selectedStockDateProvider), DateTime(2025, 12, 31));
+      expect(find.text('2025년 12월 31일 기준 (조회 전용)'), findsOneWidget);
+      expect(find.text('1,000g'), findsOneWidget);
+      expect(find.text('600g'), findsNothing);
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('지난 날짜 화면도 직원 매장의 로트만 보인다', (tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'a', name: '울산점'),
+      );
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: '부산점'),
+      );
+      final onion = await addIngredient(db, '양파');
+      final carrot = await addIngredient(db, '당근');
+      final twoDaysAgo = twoDaysAgoDate().add(const Duration(hours: 9));
+      await LotRepository(db).receiveLot(
+        ingredientId: onion,
+        storeId: 'a',
+        receivedDate: twoDaysAgo,
+        unitCost: 1,
+        baseQty: 100,
+      );
+      await LotRepository(db).receiveLot(
+        ingredientId: carrot,
+        storeId: 'b',
+        receivedDate: twoDaysAgo,
+        unitCost: 1,
+        baseQty: 200,
+      );
+
+      await pumpAs(
+        tester,
+        db,
+        session: AuthSession(
+          id: 'staff',
+          email: 'staff@internal.local',
+          pin: '111111',
+          displayName: '직원',
+          role: 'staff',
+          storeId: 'a',
+          storeName: '울산점',
+        ),
+        date: twoDaysAgoDate(),
+      );
+
+      expect(find.text('양파'), findsOneWidget);
+      expect(find.text('당근'), findsNothing);
+
+      await disposeScreen(tester);
+    });
+  });
+
+  group('좁은 화면의 앱바', () {
+    const longStoreName = '부산 해운대 센텀시티 지점';
+
+    for (final width in [360.0, 320.0]) {
+      for (final date in [null, DateTime(2025, 12, 31)]) {
+        testWidgets(
+          '사장 세션, 폭 ${width.toInt()}, 날짜 ${date == null ? '오늘' : '지난 날짜'}: '
+          '넘치지 않고 제목과 날짜 버튼이 보인다',
+          (tester) async {
+            final db = AppDatabase(NativeDatabase.memory());
+            addTearDown(db.close);
+            await db.storeDao.upsertStore(
+              StoresCompanion.insert(id: 'a', name: '울산점'),
+            );
+            await db.storeDao.upsertStore(
+              StoresCompanion.insert(id: 'b', name: longStoreName),
+            );
+            await setWidth(tester, width);
+
+            await pumpAs(
+              tester,
+              db,
+              session: AuthSession(
+                id: 'owner',
+                email: 'owner@internal.local',
+                pin: '123456',
+                displayName: '사장님',
+                role: 'owner',
+              ),
+              date: date,
+              selectedStore: const Store(id: 'b', name: longStoreName),
+            );
+
+            expect(tester.takeException(), isNull);
+            expect(find.byKey(const Key('stockDateButton')), findsOneWidget);
+            // 제목이 자기 글자 폭만큼은 남아 있어야 한다 (0폭으로 사라지지 않는다).
+            final title = find.text('재고 조회');
+            expect(title, findsOneWidget);
+            final natural = tester
+                .renderObject<RenderParagraph>(title)
+                .getMaxIntrinsicWidth(double.infinity);
+            expect(tester.getSize(title).width, greaterThanOrEqualTo(natural));
+
+            await disposeScreen(tester);
+          },
+        );
+      }
+    }
+
+    Future<void> pumpOwnerWithLongStore(WidgetTester tester) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'a', name: '울산점'),
+      );
+      await db.storeDao.upsertStore(
+        StoresCompanion.insert(id: 'b', name: longStoreName),
+      );
+      await setWidth(tester, 360);
+      await pumpAs(
+        tester,
+        db,
+        session: AuthSession(
+          id: 'owner',
+          email: 'owner@internal.local',
+          pin: '123456',
+          displayName: '사장님',
+          role: 'owner',
+        ),
+        selectedStore: const Store(id: 'b', name: longStoreName),
+      );
+    }
+
+    testWidgets('긴 매장명은 닫힌 스위처에서 말줄임되고 폭이 화면의 22%를 넘지 않는다', (tester) async {
+      await pumpOwnerWithLongStore(tester);
+
+      final selectedText = find.descendant(
+        of: find.byKey(const Key('storeSwitcherDropdown')),
+        matching: find.text(longStoreName),
+      );
+      expect(selectedText, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(selectedText);
+      expect(paragraph.didExceedMaxLines, isTrue);
+      expect(tester.getSize(selectedText).width, lessThanOrEqualTo(360 * 0.22));
+
+      await disposeScreen(tester);
+    });
+
+    testWidgets('스위처를 열면 전체 매장명이 잘리지 않고 보인다', (tester) async {
+      await pumpOwnerWithLongStore(tester);
+
+      await tester.tap(find.byKey(const Key('storeSwitcherDropdown')));
+      await tester.pumpAndSettle();
+
+      final paragraphs = tester.renderObjectList<RenderParagraph>(
+        find.text(longStoreName),
+      );
+      expect(
+        paragraphs.any(
+          (p) =>
+              !p.didExceedMaxLines &&
+              p.size.width >= p.getMaxIntrinsicWidth(double.infinity),
+        ),
+        isTrue,
+      );
 
       await disposeScreen(tester);
     });

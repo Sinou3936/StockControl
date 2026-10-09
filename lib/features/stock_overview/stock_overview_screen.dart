@@ -19,6 +19,9 @@ const _kGap = 12.0;
 const _kMinCardWidth = 220.0;
 const _kMaxColumns = 4;
 
+/// 이 폭보다 좁으면 앱바의 날짜 버튼이 아이콘만 남는다.
+const _kNarrowWidth = 600.0;
+
 class StockOverviewScreen extends ConsumerWidget {
   const StockOverviewScreen({super.key});
 
@@ -31,38 +34,53 @@ class StockOverviewScreen extends ConsumerWidget {
     final selected = ref.watch(selectedStockDateProvider);
     final now = DateTime.now();
     final isToday = selected == null || isSameDay(selected, now);
-    // selected가 널이 아닐 때만 else 가지로 오므로 널 승격이 된다.
-    final day = selected == null || isSameDay(selected, now)
-        ? dayStart(now)
-        : selected;
+    // isToday가 거짓이면 selected는 널이 아니다 (Dart가 isToday 변수로 타입을 좁힌다).
+    final day = isToday ? dayStart(now) : selected;
 
     // 오늘은 지금처럼 로트의 남은 수량, 지난 날짜는 그날 끝까지의 기록 합계.
     final Stream<List<LotWithIngredient>> stockStream = isToday
         ? lotDao.watchAvailableLotsWithIngredient(storeId: storeId)
         : movementDao.watchStockAsOf(dayEnd(day), storeId: storeId);
 
+    // 화면을 자정 넘어 켜 둬도 달력의 "오늘"이 따라가도록 누른 순간의 시각을 쓴다.
+    Future<void> pickDate() async {
+      final last = dayStart(DateTime.now());
+      final picked = await showDatePicker(
+        context: context,
+        // 저장된 날짜가 미래(자정을 넘긴 경우 등)여도 달력이 단정 오류를 내지 않게.
+        initialDate: day.isAfter(last) ? last : day,
+        firstDate: DateTime(2020),
+        lastDate: last,
+      );
+      if (picked == null) return;
+      ref.read(selectedStockDateProvider.notifier).state = stockDateSelection(
+        picked,
+        now: DateTime.now(),
+      );
+    }
+
+    // 폰 폭에서는 제목·날짜 버튼·매장 선택이 한 줄에 다 들어가지 않는다. 날짜는
+    // 아이콘만 두고(글자는 툴팁), 지난 날짜일 때는 배너가 날짜를 보여 준다.
+    final dateLabel = stockDateLabel(selected, now: now);
+    final narrow = MediaQuery.sizeOf(context).width < _kNarrowWidth;
+    final Widget dateButton = narrow
+        ? IconButton(
+            key: const Key('stockDateButton'),
+            tooltip: dateLabel,
+            icon: const Icon(Icons.calendar_today_outlined, size: 20),
+            onPressed: pickDate,
+          )
+        : TextButton.icon(
+            key: const Key('stockDateButton'),
+            icon: const Icon(Icons.calendar_today_outlined, size: 18),
+            label: Text(dateLabel),
+            onPressed: pickDate,
+          );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('재고 조회'),
-        actions: [
-          TextButton.icon(
-            key: const Key('stockDateButton'),
-            icon: const Icon(Icons.calendar_today_outlined, size: 18),
-            label: Text(stockDateLabel(selected, now: now)),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: day,
-                firstDate: DateTime(2020),
-                lastDate: dayStart(now),
-              );
-              if (picked == null) return;
-              ref.read(selectedStockDateProvider.notifier).state =
-                  stockDateSelection(picked, now: DateTime.now());
-            },
-          ),
-          const StoreSwitcher(),
-        ],
+        actions: [dateButton, const StoreSwitcher()],
       ),
       body: Column(
         children: [
@@ -80,13 +98,18 @@ class StockOverviewScreen extends ConsumerWidget {
                   for (final s in storeSnapshot.data ?? <Store>[]) s.id: s.name,
                 };
                 return StreamBuilder<List<LotWithIngredient>>(
+                  // 날짜(모드)가 바뀌면 이전 모드의 마지막 값이 새 모드로 한 프레임
+                  // 그려지지 않도록 상태를 새로 만든다.
+                  key: ValueKey(isToday ? 'live' : day),
                   stream: stockStream,
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return const SizedBox.shrink();
                     return _StockBody(
                       rows: snapshot.data!,
                       storeNames: storeNames,
-                      now: now,
+                      // 값이 올 때마다 지금 시각으로: 자정을 넘겨 켜 둔 화면의
+                      // 임박 판정이 어제 기준에 머물지 않게 (옛 코드와 같다).
+                      now: DateTime.now(),
                       isToday: isToday,
                     );
                   },
@@ -352,7 +375,7 @@ class _IngredientCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alert = !readOnly && group.hasNearExpiryLot;
+    final alert = group.hasNearExpiryLot;
 
     // 테두리를 Container의 decoration에 맡기면 마지막 로트 줄의 불투명한 배경이
     // 아래쪽 두 모서리의 호 구간 테두리를 덮는다. Material의 shape는 테두리를
