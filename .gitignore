@@ -47,3 +47,7 @@ app.*.map.json
 
 # Brainstorming visual companion mockups
 .superpowers/
+
+# 사용 설명서 PDF에는 앱 화면 캡처가 들어 있어서 저장소에 올리지 않는다.
+*.pdf
+docs/manual/
