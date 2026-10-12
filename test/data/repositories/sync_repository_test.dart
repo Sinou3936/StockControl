@@ -459,6 +459,41 @@ void main() {
     expect(updated.baseUnit, 'g');
     expect(updated.purchaseUnit, '박스');
     expect(updated.conversionFactor, 20000);
+    // 유통기한 관리 여부는 품목 수정 창에서 고치므로 서버 값을 따른다.
+    expect(updated.isExpiryTracked, isTrue);
+  });
+
+  test('pullUpdates turns expiry tracking off when the server says so', () async {
+    final localId = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: true,
+      ),
+    );
+    final local = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == localId);
+
+    final gateway = FakeSyncGateway();
+    gateway.tableRows['ingredients'] = [
+      {
+        'id': local.syncId,
+        'name': '양파',
+        'category': null,
+        'base_unit': 'g',
+        'purchase_unit': '박스',
+        'conversion_factor': 20000,
+        'is_expiry_tracked': false,
+        'safety_stock_qty': null,
+        'synced_at': DateTime(2026, 10, 6).toIso8601String(),
+      },
+    ];
+    await SyncRepository(gateway, db).pullUpdates(isOwner: true);
+
+    final updated = (await db.ingredientDao.watchAll().first)
+        .firstWhere((i) => i.id == localId);
     expect(updated.isExpiryTracked, isFalse);
   });
 

@@ -47,8 +47,7 @@ void main() {
     expect(saved.syncId, isNotNull);
   });
 
-  test('insertIngredient also enqueues a sync entry for the new row',
-      () async {
+  test('insertIngredient also enqueues a sync entry for the new row', () async {
     final id = await db.ingredientDao.insertIngredient(
       IngredientsCompanion.insert(
         name: '당근',
@@ -64,29 +63,97 @@ void main() {
     expect(queued.recordId, id);
   });
 
-  test('updateSafetyStock writes the value and queues the row for sync',
-      () async {
-    final id = await db.ingredientDao.insertIngredient(
-      IngredientsCompanion.insert(
-        name: '양파',
-        baseUnit: 'g',
-        purchaseUnit: '박스',
-        conversionFactor: 20000,
+  test(
+    'updateSafetyStock writes the value and queues the row for sync',
+    () async {
+      final id = await db.ingredientDao.insertIngredient(
+        IngredientsCompanion.insert(
+          name: '양파',
+          baseUnit: 'g',
+          purchaseUnit: '박스',
+          conversionFactor: 20000,
+          isExpiryTracked: false,
+        ),
+      );
+      await db.delete(db.syncQueue).go();
+
+      await db.ingredientDao.updateSafetyStock(id, 5000);
+
+      final saved = (await db.ingredientDao.watchAll().first).firstWhere(
+        (i) => i.id == id,
+      );
+      expect(saved.safetyStockQty, 5000);
+
+      final queued = await db.syncQueueDao.oldest();
+      expect(queued!.targetTable, 'ingredients');
+      expect(queued.recordId, id);
+    },
+  );
+
+  test(
+    'updateSettings writes both fields and queues one row for sync',
+    () async {
+      final id = await db.ingredientDao.insertIngredient(
+        IngredientsCompanion.insert(
+          name: '양파',
+          baseUnit: 'g',
+          purchaseUnit: '박스',
+          conversionFactor: 20000,
+          isExpiryTracked: true,
+          safetyStockQty: const Value(5000),
+        ),
+      );
+      await db.delete(db.syncQueue).go();
+
+      await db.ingredientDao.updateSettings(
+        id,
+        safetyStockQty: 3000,
         isExpiryTracked: false,
-      ),
-    );
-    await db.delete(db.syncQueue).go();
+      );
 
-    await db.ingredientDao.updateSafetyStock(id, 5000);
+      final saved = (await db.ingredientDao.watchAll().first).firstWhere(
+        (i) => i.id == id,
+      );
+      expect(saved.safetyStockQty, 3000);
+      expect(saved.isExpiryTracked, isFalse);
+      // 이름·단위·환산계수는 건드리지 않는다.
+      expect(saved.name, '양파');
+      expect(saved.conversionFactor, 20000);
 
-    final saved = (await db.ingredientDao.watchAll().first)
-        .firstWhere((i) => i.id == id);
-    expect(saved.safetyStockQty, 5000);
+      final queued = await db.select(db.syncQueue).get();
+      expect(queued, hasLength(1));
+      expect(queued.single.targetTable, 'ingredients');
+      expect(queued.single.recordId, id);
+    },
+  );
 
-    final queued = await db.syncQueueDao.oldest();
-    expect(queued!.targetTable, 'ingredients');
-    expect(queued.recordId, id);
-  });
+  test(
+    'updateSettings can clear the safety stock and turn tracking on',
+    () async {
+      final id = await db.ingredientDao.insertIngredient(
+        IngredientsCompanion.insert(
+          name: '양파',
+          baseUnit: 'g',
+          purchaseUnit: '박스',
+          conversionFactor: 20000,
+          isExpiryTracked: false,
+          safetyStockQty: const Value(5000),
+        ),
+      );
+
+      await db.ingredientDao.updateSettings(
+        id,
+        safetyStockQty: null,
+        isExpiryTracked: true,
+      );
+
+      final saved = (await db.ingredientDao.watchAll().first).firstWhere(
+        (i) => i.id == id,
+      );
+      expect(saved.safetyStockQty, isNull);
+      expect(saved.isExpiryTracked, isTrue);
+    },
+  );
 
   test('updateSafetyStock with null clears tracking', () async {
     final id = await db.ingredientDao.insertIngredient(
@@ -102,8 +169,9 @@ void main() {
 
     await db.ingredientDao.updateSafetyStock(id, null);
 
-    final saved = (await db.ingredientDao.watchAll().first)
-        .firstWhere((i) => i.id == id);
+    final saved = (await db.ingredientDao.watchAll().first).firstWhere(
+      (i) => i.id == id,
+    );
     expect(saved.safetyStockQty, isNull);
   });
 }

@@ -337,6 +337,75 @@ void main() {
     await disposeScreen(tester);
   });
 
+  Future<bool> savedExpiry(int id) async =>
+      (await db.select(db.ingredients).get())
+          .firstWhere((i) => i.id == id)
+          .isExpiryTracked;
+
+  bool checkboxValue(WidgetTester tester) => tester
+      .widget<CheckboxListTile>(find.byKey(const Key('editExpiryTracked')))
+      .value!;
+
+  testWidgets('수정 다이얼로그에 유통기한 관리가 현재 값으로 보인다', (tester) async {
+    await addIngredient(expiry: true);
+    await openSafetyStockDialog(tester);
+    expect(checkboxValue(tester), isTrue);
+    await disposeScreen(tester);
+  });
+
+  testWidgets('관리 안 함인 품목은 수정 다이얼로그에서 체크가 꺼져 있다', (tester) async {
+    await addIngredient();
+    await openSafetyStockDialog(tester);
+    expect(checkboxValue(tester), isFalse);
+    await disposeScreen(tester);
+  });
+
+  testWidgets('유통기한 관리를 끄고 저장하면 안전재고는 그대로 두고 꺼진다', (tester) async {
+    final id = await addIngredient(safety: 5000, expiry: true);
+
+    await openSafetyStockDialog(tester);
+    await tester.tap(find.byKey(const Key('editExpiryTracked')));
+    await tester.pump();
+    expect(checkboxValue(tester), isFalse);
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(await savedExpiry(id), isFalse);
+    expect(await savedSafety(id), 5000);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('유통기한 관리를 켜고 저장하면 켜지고 목록 칩도 생긴다', (tester) async {
+    final id = await addIngredient();
+
+    await openSafetyStockDialog(tester);
+    await tester.tap(find.byKey(const Key('editExpiryTracked')));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(await savedExpiry(id), isTrue);
+    expect(find.text('유통기한 관리'), findsOneWidget);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('안전재고가 읽을 수 없으면 유통기한 관리도 저장하지 않는다', (tester) async {
+    final id = await addIngredient(expiry: true);
+
+    await openSafetyStockDialog(tester);
+    await tester.tap(find.byKey(const Key('editExpiryTracked')));
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '.');
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(safetyStockError), findsOneWidget);
+    expect(await savedExpiry(id), isTrue);
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('오류가 뜬 뒤 값을 고치면 오류가 사라지고 저장된다', (tester) async {
     final id = await addIngredient(safety: 3000);
 

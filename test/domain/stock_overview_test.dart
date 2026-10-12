@@ -3,30 +3,29 @@ import 'package:stockcontrol/data/local/database.dart';
 import 'package:stockcontrol/domain/stock_overview.dart';
 
 Ingredient _makeIngredient(int id, String name) => Ingredient(
-      id: id,
-      name: name,
-      baseUnit: 'g',
-      purchaseUnit: '박스',
-      conversionFactor: 20000,
-      isExpiryTracked: true,
-      createdAt: DateTime(2026, 9, 7),
-    );
+  id: id,
+  name: name,
+  baseUnit: 'g',
+  purchaseUnit: '박스',
+  conversionFactor: 20000,
+  isExpiryTracked: true,
+  createdAt: DateTime(2026, 9, 7),
+);
 
 Lot _makeLot(
   int id,
   int ingredientId, {
   DateTime? expiryDate,
   double remainingQty = 1000,
-}) =>
-    Lot(
-      id: id,
-      ingredientId: ingredientId,
-      receivedDate: DateTime(2026, 9, 7),
-      expiryDate: expiryDate,
-      unitCost: 10,
-      remainingQty: remainingQty,
-      createdAt: DateTime(2026, 9, 7),
-    );
+}) => Lot(
+  id: id,
+  ingredientId: ingredientId,
+  receivedDate: DateTime(2026, 9, 7),
+  expiryDate: expiryDate,
+  unitCost: 10,
+  remainingQty: remainingQty,
+  createdAt: DateTime(2026, 9, 7),
+);
 
 void _groupLotsByIngredientTests() {
   final now = DateTime(2026, 9, 7);
@@ -116,6 +115,46 @@ void _groupLotsByIngredientTests() {
 
 void main() {
   _groupLotsByIngredientTests();
+
+  group('유통기한 관리를 끈 품목', () {
+    final now = DateTime(2026, 9, 7);
+    final soon = now.add(const Duration(days: 1));
+
+    test('isLotNearExpiry: 관리하는 품목만 로트의 기한으로 임박을 판정한다', () {
+      final tracked = _makeIngredient(1, '양파');
+      final untracked = tracked.copyWith(isExpiryTracked: false);
+      final lot = _makeLot(1, 1, expiryDate: soon);
+
+      expect(isLotNearExpiry(tracked, lot, now: now), isTrue);
+      expect(isLotNearExpiry(untracked, lot, now: now), isFalse);
+    });
+
+    test('lotExpiryDate: 끄면 로트에 날짜가 있어도 없는 것으로 본다', () {
+      final tracked = _makeIngredient(1, '양파');
+      final untracked = tracked.copyWith(isExpiryTracked: false);
+      final lot = _makeLot(1, 1, expiryDate: soon);
+
+      expect(lotExpiryDate(tracked, lot), soon);
+      expect(lotExpiryDate(untracked, lot), isNull);
+    });
+
+    test('groupLotsByIngredient: 임박 표시도 임박 우선 정렬도 하지 않는다', () {
+      final onion = _makeIngredient(1, '양파').copyWith(isExpiryTracked: false);
+      final carrot = _makeIngredient(2, '당근');
+      final rows = [
+        LotWithIngredient(
+          lot: _makeLot(1, 1, expiryDate: soon),
+          ingredient: onion,
+        ),
+        LotWithIngredient(lot: _makeLot(2, 2), ingredient: carrot),
+      ];
+
+      final groups = groupLotsByIngredient(rows, now: now);
+
+      expect(groups.map((g) => g.ingredient.name), ['당근', '양파']);
+      expect(groups.every((g) => !g.hasNearExpiryLot), isTrue);
+    });
+  });
 
   group('isNearExpiry', () {
     final now = DateTime(2026, 9, 7);

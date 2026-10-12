@@ -9,6 +9,22 @@ bool isNearExpiry(
   return !expiryDate.isAfter(now.add(Duration(days: thresholdDays)));
 }
 
+/// 로트의 유통기한. 유통기한 관리를 하는 품목만 쓴다: 끈 품목은 로트에 날짜가
+/// 남아 있어도 없는 것으로 본다 (다시 켜면 그 날짜가 다시 쓰인다).
+DateTime? lotExpiryDate(Ingredient ingredient, Lot lot) =>
+    ingredient.isExpiryTracked ? lot.expiryDate : null;
+
+bool isLotNearExpiry(
+  Ingredient ingredient,
+  Lot lot, {
+  required DateTime now,
+  int thresholdDays = 3,
+}) => isNearExpiry(
+  lotExpiryDate(ingredient, lot),
+  now: now,
+  thresholdDays: thresholdDays,
+);
+
 class LotWithIngredient {
   LotWithIngredient({required this.lot, required this.ingredient});
 
@@ -45,12 +61,13 @@ List<IngredientStockGroup> groupLotsByIngredient(
 
   final groups = byIngredient.values.map((groupRows) {
     final lots = groupRows.map((r) => r.lot).toList();
+    final ingredient = groupRows.first.ingredient;
     return IngredientStockGroup(
-      ingredient: groupRows.first.ingredient,
+      ingredient: ingredient,
       lots: lots,
       hasNearExpiryLot:
           flagNearExpiry &&
-          lots.any((lot) => isNearExpiry(lot.expiryDate, now: now)),
+          lots.any((lot) => isLotNearExpiry(ingredient, lot, now: now)),
     );
   }).toList();
 

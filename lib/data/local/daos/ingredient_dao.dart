@@ -15,10 +15,30 @@ class IngredientDao extends DatabaseAccessor<AppDatabase>
 
   Future<int> insertIngredient(IngredientsCompanion entry) {
     return attachedDatabase.transaction(() async {
-      final id = await into(ingredients)
-          .insert(entry.copyWith(syncId: Value(generateSyncId())));
+      final id = await into(
+        ingredients,
+      ).insert(entry.copyWith(syncId: Value(generateSyncId())));
       await attachedDatabase.syncQueueDao.enqueue('ingredients', id);
       return id;
+    });
+  }
+
+  /// 품목 수정 창에서 고치는 두 값(안전재고, 유통기한 관리)을 함께 쓴다. 이름·
+  /// 단위·환산계수는 과거 로트와 어긋날 수 있어 고치지 않는다. 한 번에 한 줄만
+  /// 전송 큐에 남긴다.
+  Future<void> updateSettings(
+    int id, {
+    required double? safetyStockQty,
+    required bool isExpiryTracked,
+  }) {
+    return attachedDatabase.transaction(() async {
+      await (update(ingredients)..where((i) => i.id.equals(id))).write(
+        IngredientsCompanion(
+          safetyStockQty: Value(safetyStockQty),
+          isExpiryTracked: Value(isExpiryTracked),
+        ),
+      );
+      await attachedDatabase.syncQueueDao.enqueue('ingredients', id);
     });
   }
 

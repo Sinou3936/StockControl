@@ -132,6 +132,61 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
+  Future<AppDatabase> dbWithLot({
+    required bool tracked,
+    DateTime? expiry,
+  }) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final id = await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '양파',
+        baseUnit: 'g',
+        purchaseUnit: '박스',
+        conversionFactor: 20000,
+        isExpiryTracked: tracked,
+      ),
+    );
+    await db.lotDao.insertLot(
+      LotsCompanion.insert(
+        ingredientId: id,
+        receivedDate: DateTime.now(),
+        expiryDate: Value(expiry),
+        unitCost: 10,
+        remainingQty: 5000,
+      ),
+    );
+    return db;
+  }
+
+  testWidgets('유통기한 관리를 끈 품목은 로트에 기한이 있어도 임박이 아니다', (tester) async {
+    final db = await dbWithLot(
+      tracked: false,
+      expiry: DateTime.now().add(const Duration(days: 1)),
+    );
+
+    await pumpScreen(tester, db);
+
+    expect(find.text('임박'), findsNothing);
+    // 로트에 남아 있는 날짜는 보이지 않고, 관리하지 않는다고 알려 준다.
+    expect(find.text('유통기한 관리 안 함'), findsOneWidget);
+    expect(find.textContaining('기한 20'), findsNothing);
+
+    await disposeScreen(tester);
+  });
+
+  testWidgets('유통기한 관리 품목인데 기한을 안 적은 로트는 기한 미입력으로 보인다', (tester) async {
+    final db = await dbWithLot(tracked: true);
+
+    await pumpScreen(tester, db);
+
+    expect(find.text('기한 미입력'), findsOneWidget);
+    expect(find.text('유통기한 관리 안 함'), findsNothing);
+    expect(find.text('임박'), findsNothing);
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('shows an empty-state message when there is no stock', (
     tester,
   ) async {

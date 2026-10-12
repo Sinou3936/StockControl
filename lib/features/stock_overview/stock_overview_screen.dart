@@ -254,7 +254,9 @@ class _StockBodyState extends State<_StockBody> {
       0,
       (sum, g) =>
           sum +
-          g.lots.where((l) => isNearExpiry(l.expiryDate, now: now)).length,
+          g.lots
+              .where((l) => isLotNearExpiry(g.ingredient, l, now: now))
+              .length,
     );
 
     return CenteredContent(
@@ -491,7 +493,7 @@ class _IngredientCard extends StatelessWidget {
     final collapsedLots = [
       for (var i = 0; i < lots.length; i++)
         if (i < _kLotPreviewCount ||
-            (!readOnly && isNearExpiry(lots[i].expiryDate, now: now)))
+            (!readOnly && isLotNearExpiry(group.ingredient, lots[i], now: now)))
           lots[i],
     ];
     final hiddenCount = lots.length - collapsedLots.length;
@@ -609,10 +611,15 @@ class _LotRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final near = !readOnly && isNearExpiry(lot.expiryDate, now: now);
-    final expiryText = lot.expiryDate == null
+    final near = !readOnly && isLotNearExpiry(ingredient, lot, now: now);
+    // 관리하는 품목만 로트의 기한을 쓴다. 관리하는데 날짜를 안 적었으면 그렇게
+    // 알려 준다 (예전에는 이것도 '관리 안 함'으로 보였다).
+    final expiry = lotExpiryDate(ingredient, lot);
+    final expiryText = !ingredient.isExpiryTracked
         ? '유통기한 관리 안 함'
-        : '기한 ${lot.expiryDate!.toIso8601String().substring(0, 10)}';
+        : expiry == null
+        ? '기한 미입력'
+        : '기한 ${expiry.toIso8601String().substring(0, 10)}';
 
     return Material(
       color: near ? AppColors.dangerBackground : AppColors.surface,
@@ -640,7 +647,7 @@ class _LotRow extends StatelessWidget {
                       expiryText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: lot.expiryDate == null
+                        color: expiry == null
                             ? AppColors.textMuted
                             : AppColors.textBody,
                       ),

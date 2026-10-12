@@ -85,7 +85,7 @@ class IngredientListScreen extends ConsumerWidget {
   }
 
   /// 안전재고 값만 고친다. 이름·단위·환산계수는 과거 로트와 어긋날 수 있어
-  /// 이번 범위에서 수정 대상이 아니다.
+  /// 이번 범위에서 수정 대상이 아니다. 안전재고와 함께 유통기한 관리 여부도 고친다.
   Future<void> _showSafetyStockDialog(
     BuildContext context,
     IngredientDao dao,
@@ -97,12 +97,13 @@ class IngredientListScreen extends ConsumerWidget {
           : groupThousands(safetyStockInputText(ingredient.safetyStockQty!)),
     );
     String? error;
+    var isExpiryTracked = ingredient.isExpiryTracked;
 
     await showDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text('${ingredient.name} 안전재고'),
+          title: Text('${ingredient.name} 수정'),
           content: SizedBox(
             width: 380,
             child: Column(
@@ -131,6 +132,19 @@ class IngredientListScreen extends ConsumerWidget {
                   '비워 두면 이 품목은 부족 알림에서 제외됩니다.',
                   style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
+                CheckboxListTile(
+                  key: const Key('editExpiryTracked'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('유통기한 관리'),
+                  subtitle: const Text(
+                    '끄면 이 품목의 기한은 임박 표시에서 빠집니다 (이미 입력한 기한은 남아 있고, 다시 켜면 쓰입니다).',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
+                  value: isExpiryTracked,
+                  onChanged: (value) =>
+                      setState(() => isExpiryTracked = value ?? false),
+                ),
               ],
             ),
           ),
@@ -146,7 +160,11 @@ class IngredientListScreen extends ConsumerWidget {
                   setState(() => error = _safetyStockErrorMessage);
                   return;
                 }
-                await dao.updateSafetyStock(ingredient.id, parsed.value);
+                await dao.updateSettings(
+                  ingredient.id,
+                  safetyStockQty: parsed.value,
+                  isExpiryTracked: isExpiryTracked,
+                );
                 if (context.mounted) Navigator.of(context).pop();
               },
               child: const Text('저장'),
