@@ -304,11 +304,13 @@ void main() {
     await disposeScreen(tester);
   });
 
-  testWidgets('수정 다이얼로그에 5000g를 넣으면 오류를 보이고 저장하지 않는다', (tester) async {
+  testWidgets('수정 다이얼로그에 점(.)만 남아 숫자로 읽을 수 없으면 오류를 보이고 저장하지 않는다', (
+    tester,
+  ) async {
     final id = await addIngredient(safety: 5000);
 
     await openSafetyStockDialog(tester);
-    await tester.enterText(find.byKey(const Key('safetyStockField')), '5000g');
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '.');
     await tester.tap(find.widgetWithText(TextButton, '저장'));
     await tester.pumpAndSettle();
 
@@ -319,11 +321,27 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('수정 다이얼로그는 기존 안전재고를 쉼표와 함께 보여 주고 그대로 저장해도 값이 같다', (tester) async {
+    final id = await addIngredient(safety: 5000);
+
+    await openSafetyStockDialog(tester);
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('safetyStockField')),
+    );
+    expect(field.controller!.text, '5,000');
+
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+    expect(await savedSafety(id), 5000);
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('오류가 뜬 뒤 값을 고치면 오류가 사라지고 저장된다', (tester) async {
     final id = await addIngredient(safety: 3000);
 
     await openSafetyStockDialog(tester);
-    await tester.enterText(find.byKey(const Key('safetyStockField')), '5000g');
+    await tester.enterText(find.byKey(const Key('safetyStockField')), '.');
     await tester.tap(find.widgetWithText(TextButton, '저장'));
     await tester.pumpAndSettle();
     expect(find.text(safetyStockError), findsOneWidget);
@@ -359,8 +377,8 @@ void main() {
     await disposeScreen(tester);
   });
 
-  testWidgets('신규 등록에서 안전재고에 abc를 넣으면 오류를 보이고 품목을 만들지 않는다', (tester) async {
-    await openAddDialogAndFill(tester, safety: 'abc');
+  testWidgets('신규 등록에서 안전재고에 점(.)만 넣으면 오류를 보이고 품목을 만들지 않는다', (tester) async {
+    await openAddDialogAndFill(tester, safety: '.');
     await tester.tap(find.widgetWithText(TextButton, '저장'));
     await tester.pumpAndSettle();
 

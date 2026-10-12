@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
+import '../../core/format/thousands_input.dart';
 import '../../core/providers/dao_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
@@ -66,8 +67,7 @@ class IngredientListScreen extends ConsumerWidget {
                               const InfoChip('유통기한 관리'),
                           ],
                         ),
-                  onTap: () =>
-                      _showSafetyStockDialog(context, dao, ingredient),
+                  onTap: () => _showSafetyStockDialog(context, dao, ingredient),
                 );
               },
             ),
@@ -94,7 +94,7 @@ class IngredientListScreen extends ConsumerWidget {
     final controller = TextEditingController(
       text: ingredient.safetyStockQty == null
           ? ''
-          : safetyStockInputText(ingredient.safetyStockQty!),
+          : groupThousands(safetyStockInputText(ingredient.safetyStockQty!)),
     );
     String? error;
 
@@ -116,6 +116,7 @@ class IngredientListScreen extends ConsumerWidget {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  inputFormatters: const [ThousandsSeparatorFormatter()],
                   decoration: InputDecoration(
                     labelText: '안전재고',
                     suffixText: ingredient.baseUnit,
@@ -217,6 +218,7 @@ class IngredientListScreen extends ConsumerWidget {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    inputFormatters: const [ThousandsSeparatorFormatter()],
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -225,6 +227,7 @@ class IngredientListScreen extends ConsumerWidget {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    inputFormatters: const [ThousandsSeparatorFormatter()],
                     decoration: InputDecoration(
                       labelText: '안전재고 (선택)',
                       suffixText: selectedBaseUnit.name,
@@ -255,7 +258,7 @@ class IngredientListScreen extends ConsumerWidget {
             ),
             TextButton(
               onPressed: () async {
-                final factor = double.tryParse(conversionFactorController.text);
+                final factor = parseThousands(conversionFactorController.text);
                 if (nameController.text.trim().isEmpty ||
                     purchaseUnitController.text.trim().isEmpty ||
                     factor == null) {

@@ -236,7 +236,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(qtyText(tester, 1), '12345');
+    // 화면에는 쉼표가 붙고(12,345) 발주서에는 12345로 들어간다.
+    expect(qtyText(tester, 1), '12,345');
     await tester.tap(find.byKey(const Key('savePdfButton')));
     await tester.pump();
     expect(

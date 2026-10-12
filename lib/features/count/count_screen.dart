@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
+import '../../core/format/thousands_input.dart';
 import '../../core/providers/dao_providers.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/providers/store_providers.dart';
@@ -104,7 +105,7 @@ class _CountScreenState extends ConsumerState<CountScreen> {
   }
 
   void _onCountChanged(int ingredientId, String value) {
-    final parsed = double.tryParse(value);
+    final parsed = parseThousands(value);
     if (parsed == null) {
       _enteredCounts.remove(ingredientId);
     } else {
@@ -255,6 +256,7 @@ class _CountRow extends StatelessWidget {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              inputFormatters: const [ThousandsSeparatorFormatter()],
               onChanged: (value) => onChanged(ingredient.id, value),
             ),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
+import '../../core/format/thousands_input.dart';
 import '../../core/providers/dao_providers.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/providers/store_providers.dart';
@@ -68,7 +69,7 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
     final supplierDao = ref.watch(supplierDaoProvider);
     final ingredientDao = ref.watch(ingredientDaoProvider);
     final ingredient = _selectedIngredient;
-    final purchaseQty = double.tryParse(_purchaseQtyController.text);
+    final purchaseQty = parseThousands(_purchaseQtyController.text);
 
     return Form(
       key: _formKey,
@@ -178,11 +179,12 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
                           : '수량 (${ingredient.purchaseUnit})',
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: const [ThousandsSeparatorFormatter()],
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return '수량을 입력하세요';
                       }
-                      if (double.tryParse(value) == null) return '숫자를 입력하세요';
+                      if (parseThousands(value) == null) return '숫자를 입력하세요';
                       return null;
                     },
                     onChanged: (_) => setState(() {}),
@@ -202,11 +204,12 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
                     controller: _unitCostController,
                     decoration: const InputDecoration(labelText: '단가'),
                     keyboardType: TextInputType.number,
+                    inputFormatters: const [ThousandsSeparatorFormatter()],
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return '단가를 입력하세요';
                       }
-                      if (double.tryParse(value) == null) return '숫자를 입력하세요';
+                      if (parseThousands(value) == null) return '숫자를 입력하세요';
                       return null;
                     },
                   ),
@@ -280,8 +283,8 @@ class _InboundFormScreenState extends ConsumerState<InboundFormScreen> {
     if (_selectedIngredient == null) return;
 
     final ingredient = _selectedIngredient!;
-    final purchaseQty = double.parse(_purchaseQtyController.text);
-    final unitCost = double.parse(_unitCostController.text);
+    final purchaseQty = parseThousands(_purchaseQtyController.text)!;
+    final unitCost = parseThousands(_unitCostController.text)!;
     final baseQty = purchaseQtyToBaseQty(
       purchaseQty,
       ingredient.conversionFactor,

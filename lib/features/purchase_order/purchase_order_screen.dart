@@ -1,10 +1,10 @@
 import 'dart:io' show FileSystemException;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
+import '../../core/format/thousands_input.dart';
 import '../../core/providers/dao_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
@@ -50,7 +50,7 @@ class _PurchaseOrderScreenState extends ConsumerState<PurchaseOrderScreen> {
     _date = DateTime.now();
     for (final shortage in widget.shortages) {
       _qtyControllers[shortage.ingredient.id] = TextEditingController(
-        text: '${suggestOrderQty(shortage)}',
+        text: groupThousands('${suggestOrderQty(shortage)}'),
       );
     }
   }
@@ -65,7 +65,8 @@ class _PurchaseOrderScreenState extends ConsumerState<PurchaseOrderScreen> {
 
   /// 입력칸의 수량. 비었거나 숫자가 아니면 0이라 발주서에서 빠진다.
   int _qtyOf(StockShortage shortage) =>
-      int.tryParse(_qtyControllers[shortage.ingredient.id]!.text.trim()) ?? 0;
+      parseThousands(_qtyControllers[shortage.ingredient.id]!.text)?.toInt() ??
+      0;
 
   /// 지금 입력한 상태로 만들 수 있는 발주서. 거래처를 안 골랐거나 담을 줄이
   /// 하나도 없으면 null이라 저장 버튼이 눌리지 않는다.
@@ -246,9 +247,9 @@ class _PurchaseOrderScreenState extends ConsumerState<PurchaseOrderScreen> {
               controller: _qtyControllers[id],
               enabled: checked,
               keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(5),
+              // 정수 5자리까지. 쉼표는 자리수에 세지 않는다.
+              inputFormatters: const [
+                ThousandsSeparatorFormatter(allowDecimal: false, maxDigits: 5),
               ],
               textAlign: TextAlign.end,
               decoration: const InputDecoration(isDense: true),

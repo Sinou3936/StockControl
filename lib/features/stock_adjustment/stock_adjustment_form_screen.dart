@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
+import '../../core/format/thousands_input.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
@@ -142,11 +143,12 @@ class _StockAdjustmentFormScreenState
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      inputFormatters: const [ThousandsSeparatorFormatter()],
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return '수량을 입력하세요';
                         }
-                        if (double.tryParse(value) == null) {
+                        if (parseThousands(value) == null) {
                           return '숫자를 입력하세요';
                         }
                         return null;
@@ -177,7 +179,7 @@ class _StockAdjustmentFormScreenState
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final enteredQty = double.parse(_quantityController.text);
+    final enteredQty = parseThousands(_quantityController.text)!;
     final signedQty = _type == MovementType.disposal
         ? -enteredQty
         : (_direction == _AdjustmentDirection.increase

@@ -37,26 +37,46 @@ void main() {
   tearDown(() => db.close());
 
   Widget wrap(Widget child) => ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
-        child: MaterialApp(home: child),
+    overrides: [appDatabaseProvider.overrideWithValue(db)],
+    child: MaterialApp(home: child),
+  );
+
+  testWidgets(
+    'shows an error and stays when disposal exceeds remaining stock',
+    (tester) async {
+      await tester.pumpWidget(
+        wrap(StockAdjustmentFormScreen(lot: lot, ingredient: ingredient)),
       );
 
-  testWidgets('shows an error and stays when disposal exceeds remaining stock',
-      (tester) async {
+      await tester.enterText(find.byKey(const Key('quantityField')), '500');
+      await tester.tap(find.text('저장'));
+      await tester.pump();
+
+      expect(find.textContaining('남은 수량'), findsWidgets);
+      expect(find.byType(StockAdjustmentFormScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('수량에 쉼표가 붙어도 숫자로 읽어 남은 수량과 비교한다', (tester) async {
     await tester.pumpWidget(
       wrap(StockAdjustmentFormScreen(lot: lot, ingredient: ingredient)),
     );
 
-    await tester.enterText(find.byKey(const Key('quantityField')), '500');
+    await tester.enterText(find.byKey(const Key('quantityField')), '1000');
+    await tester.pump();
+    expect(find.text('1,000'), findsOneWidget);
+
     await tester.tap(find.text('저장'));
     await tester.pump();
 
+    // 쉼표 때문에 숫자로 못 읽었다면 '숫자를 입력하세요'가 나온다.
+    expect(find.text('숫자를 입력하세요'), findsNothing);
     expect(find.textContaining('남은 수량'), findsWidgets);
-    expect(find.byType(StockAdjustmentFormScreen), findsOneWidget);
   });
 
-  testWidgets('pops back to the previous screen after a valid disposal',
-      (tester) async {
+  testWidgets('pops back to the previous screen after a valid disposal', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       wrap(
         Builder(
