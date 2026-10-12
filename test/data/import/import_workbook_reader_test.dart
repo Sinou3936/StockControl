@@ -1,5 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
+// archive는 excel이 쓰는 패키지다. 진짜 엑셀이 저장하는 리치 텍스트 파일을
+// 만들려고 테스트에서만 직접 가져온다 (pubspec에 올리지 않았다).
+// ignore: depend_on_referenced_packages
+import 'package:archive/archive.dart'
+    show Archive, ArchiveFile, ZipDecoder, ZipEncoder;
 import 'package:excel/excel.dart'
     show
         BoolCellValue,
@@ -51,6 +57,26 @@ Uint8List _build(Map<String, Map<(int, int), CellValue>> sheets) {
     }
   }
   return Uint8List.fromList(excel.encode()!);
+}
+
+/// 만들어 둔 .xlsx의 sharedStrings.xml에서 [from]을 [to]로 바꿔 다시 묶는다.
+Uint8List _replaceInSharedStrings(Uint8List bytes, String from, String to) {
+  final archive = ZipDecoder().decodeBytes(bytes);
+  final patched = Archive();
+  var replaced = false;
+  for (final file in archive.files) {
+    if (file.name == 'xl/sharedStrings.xml') {
+      final xml = utf8.decode(file.content as List<int>);
+      expect(xml, contains(from), reason: '바꿀 자리를 찾지 못했다');
+      final data = utf8.encode(xml.replaceFirst(from, to));
+      patched.addFile(ArchiveFile(file.name, data.length, data));
+      replaced = true;
+    } else {
+      patched.addFile(file);
+    }
+  }
+  expect(replaced, isTrue);
+  return Uint8List.fromList(ZipEncoder().encode(patched)!);
 }
 
 Map<(int, int), CellValue> _headers(List<String> headers, [int row = 0]) => {
@@ -187,19 +213,68 @@ void main() {
     expect(cell, '=1+1');
   });
 
-  test('시간만 있는 셀도 빈칸이 되지 않는다', () {
+  test('시간만 있는 셀은 09:30:00 글자로 읽고, 수량·날짜 칸에서는 오류가 된다', () {
     final bytes = _build({
-      kSuppliersSheet: _headers(kSupplierHeaders),
-      kIngredientsSheet: _headers(kIngredientHeaders),
-      kInboundSheet: {(0, 0): const TimeCellValue(hour: 9, minute: 30)},
+      kSuppliersSheet: {
+        ..._headers(kSupplierHeaders),
+        (1, 0): TextCellValue('다라'),
+      },
+      kIngredientsSheet: {
+        ..._headers(kIngredientHeaders),
+        (1, 0): TextCellValue('쌀'),
+        (1, 1): TextCellValue('g'),
+        (1, 2): TextCellValue('포'),
+        (1, 3): const IntCellValue(20000),
+      },
+      kInboundSheet: {
+        ..._headers(kInboundHeaders),
+        // 날짜 칸과 수량 칸에 시간만 있는 셀을 둔다.
+        (1, 0): const TimeCellValue(hour: 9, minute: 30),
+        (1, 1): TextCellValue('다라'),
+        (1, 2): TextCellValue('쌀'),
+        (1, 3): const TimeCellValue(hour: 9, minute: 30),
+      },
     });
 
-    final cell = readImportWorkbook(bytes).inbound.first.first;
+    final book = readImportWorkbook(bytes);
+    final result = _validate(book);
 
-    expect(cell, isNotNull);
+    expect(book.inbound[1][0], '09:30:00');
+    expect(book.inbound[1][3], '09:30:00');
+    expect(result.errors.map((e) => e.text), [
+      '입고 시트 2번째 줄: 날짜를 읽을 수 없습니다 (예: 2026-09-29)',
+      '입고 시트 2번째 줄: 수량은 0보다 큰 숫자여야 합니다',
+    ]);
   });
 
-  test('시트가 빠진 파일은 빠진 시트 이름을 알려 준다', () {
+  test('서식이 섞인 글자(조각으로 나뉜 글자)도 이어 붙여 읽는다', () {
+    // excel 패키지의 쓰기는 조각을 한 덩어리로 합쳐 저장하므로 패키지로는
+    // 이런 파일을 만들 수 없다. 진짜 엑셀처럼 한 글자만 굵게 쓴 글자는
+    // sharedStrings.xml에 <r>(run) 조각들로 저장되므로, 파일을 만든 뒤 그
+    // 부분을 직접 바꿔 넣는다.
+    final plain = _build({
+      kSuppliersSheet: {
+        ..._headers(kSupplierHeaders),
+        (1, 0): TextCellValue('리치자리표시'),
+      },
+      kIngredientsSheet: _headers(kIngredientHeaders),
+      kInboundSheet: _headers(kInboundHeaders),
+    });
+    final bytes = _replaceInSharedStrings(
+      plain,
+      '<si><t xml:space="preserve">리치자리표시</t></si>',
+      '<si>'
+          '<r><rPr><b/></rPr><t>대</t></r>'
+          '<r><t>현</t></r>'
+          '</si>',
+    );
+
+    final book = readImportWorkbook(bytes);
+
+    expect(book.suppliers[1][0], '다라');
+  });
+
+  test('시트가 빠진 파일은 빠진 시트와 파일에 있는 시트 이름을 알려 준다', () {
     final bytes = _build({kSuppliersSheet: _headers(kSupplierHeaders)});
 
     expect(
@@ -208,7 +283,33 @@ void main() {
         isA<ImportFileException>().having(
           (e) => e.message,
           'message',
-          allOf(contains("'품목'"), contains("'입고'"), isNot(contains("'거래처'"))),
+          allOf(
+            contains("'품목', '입고' 시트가 없습니다"),
+            contains('(파일의 시트: 거래처)'),
+            isNot(contains("'거래처'")),
+          ),
+        ),
+      ),
+    );
+  });
+
+  test('시트 이름이 Inbound인 파일은 그 이름을 메시지에 보여 준다', () {
+    final bytes = _build({
+      kSuppliersSheet: _headers(kSupplierHeaders),
+      kIngredientsSheet: _headers(kIngredientHeaders),
+      'Inbound': _headers(kInboundHeaders),
+    });
+
+    expect(
+      () => readImportWorkbook(bytes),
+      throwsA(
+        isA<ImportFileException>().having(
+          (e) => e.message,
+          'message',
+          allOf(
+            contains("'입고' 시트가 없습니다"),
+            contains('(파일의 시트: 거래처, 품목, Inbound)'),
+          ),
         ),
       ),
     );

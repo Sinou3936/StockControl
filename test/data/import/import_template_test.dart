@@ -42,12 +42,34 @@ void main() {
     });
   }
 
-  test('안내 시트에 환산계수 설명이 있다', () {
-    final rows = Excel.decodeBytes(buildImportTemplateXlsx())['안내'].rows;
+  group('안내 시트 문구', () {
+    final guideLines = [
+      for (final row in Excel.decodeBytes(buildImportTemplateXlsx())['안내'].rows)
+        for (final cell in row) text(cell) ?? '',
+    ];
 
-    expect(
-      rows.any((row) => row.any((cell) => (text(cell) ?? '').contains('환산계수'))),
-      isTrue,
-    );
+    bool hasLine(List<String> parts) =>
+        guideLines.any((line) => parts.every(line.contains));
+
+    test('환산계수의 정의와 예시', () {
+      expect(hasLine(['환산계수', '구매 단위 1개', '기본 단위로 몇 개']), isTrue);
+      expect(hasLine(['환산계수', '20000']), isTrue);
+    });
+
+    test('유통기한 관리는 예 또는 아니오, 단가를 비우면 0', () {
+      expect(hasLine(['예 또는 아니오', '비우면 아니오']), isTrue);
+      expect(hasLine(['단가를 비우면 0']), isTrue);
+    });
+
+    test('수식과 연락처 주의', () {
+      expect(
+        hasLine(['8.', '수식(=...)이 든 칸은 읽을 수 없습니다', '값으로 붙여넣어 주세요']),
+        isTrue,
+      );
+      expect(
+        hasLine(['9.', '연락처는 010-1234-5678처럼', "'-'를 넣어", '앞의 0이 사라질 수 있습니다']),
+        isTrue,
+      );
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../domain/excel_import/excel_import_types.dart';
 
@@ -15,7 +16,9 @@ class ImportFileException implements Exception {
 
 Object? _value(CellValue? v) => switch (v) {
   null => null,
-  TextCellValue() => v.value.text ?? '',
+  // 서식이 섞인 글자(예: 한 글자만 굵게)는 text가 null이고 조각이 children에
+  // 들어 있다. text만 읽으면 빈칸이 되므로 조각을 이어 붙이는 toString()을 쓴다.
+  TextCellValue() => v.value.toString(),
   IntCellValue() => v.value,
   DoubleCellValue() => v.value,
   DateCellValue() => DateTime(v.year, v.month, v.day),
@@ -46,7 +49,9 @@ RawWorkbook readImportWorkbook(Uint8List bytes) {
   final Excel excel;
   try {
     excel = Excel.decodeBytes(bytes);
-  } catch (_) {
+  } catch (error, stack) {
+    // 사용자에게는 쉬운 안내만 보이고, 진짜 원인은 로그에 남긴다.
+    debugPrint('엑셀 읽기 실패: $error\n$stack');
     throw const ImportFileException(
       '엑셀 파일(.xlsx)을 읽을 수 없습니다. 앱에서 받은 양식을 .xlsx로 저장해 올려 주세요.',
     );
@@ -58,8 +63,10 @@ RawWorkbook readImportWorkbook(Uint8List bytes) {
       if (!excel.tables.containsKey(name)) "'$name'",
   ];
   if (missing.isNotEmpty) {
+    final found = excel.tables.keys.join(', ');
     throw ImportFileException(
-      '${missing.join(', ')} 시트가 없습니다. 앱에서 받은 양식을 그대로 써 주세요.',
+      '${missing.join(', ')} 시트가 없습니다 (파일의 시트: $found). '
+      '앱에서 받은 양식을 그대로 써 주세요.',
     );
   }
 
