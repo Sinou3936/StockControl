@@ -64,6 +64,10 @@ void main() {
       expect(hasLine(['10.', '구매 단위', '단위 이름', '숫자만 적지 마세요', '환산계수']), isTrue);
     });
 
+    test('기본 단위가 kg나 L이면 환산계수도 그 단위 기준이라고 안내한다', () {
+      expect(hasLine(['11.', 'kg', 'L', '환산계수도', '20000', '20']), isTrue);
+    });
+
     test('품목 시트 예시 줄이 안내 시트에 있다 (데이터 시트가 아니라)', () {
       expect(hasLine(['품목 시트 예시']), isTrue);
       expect(guideLines, containsAll(kIngredientHeaders));
