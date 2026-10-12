@@ -74,6 +74,71 @@ void main() {
     expect(find.textContaining('남은 수량'), findsWidgets);
   });
 
+  Future<void> pumpTall(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      wrap(StockAdjustmentFormScreen(lot: lot, ingredient: ingredient)),
+    );
+  }
+
+  bool switchValue(WidgetTester tester) => tester
+      .widget<SwitchListTile>(find.byKey(const Key('expiryTrackedSwitch')))
+      .value;
+
+  testWidgets('변경 내용에 유통기한 관리 스위치가 품목의 현재 값으로 보인다', (tester) async {
+    await pumpTall(tester);
+
+    expect(find.text('유통기한 관리'), findsOneWidget);
+    expect(switchValue(tester), isFalse); // setUp의 품목은 관리 안 함
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('스위치를 켜면 저장 버튼 없이 바로 품목에 저장되고 화면과 입력은 그대로다', (tester) async {
+    await pumpTall(tester);
+    await db.delete(db.syncQueue).go();
+    await tester.enterText(find.byKey(const Key('quantityField')), '30');
+
+    await tester.tap(find.byKey(const Key('expiryTrackedSwitch')));
+    await tester.pumpAndSettle();
+
+    final saved = (await db.select(db.ingredients).get()).single;
+    expect(saved.isExpiryTracked, isTrue);
+    expect(switchValue(tester), isTrue);
+    // 화면은 닫히지 않고, 적어 둔 수량도 남아 있고, 재고 기록은 만들어지지 않는다.
+    expect(find.byType(StockAdjustmentFormScreen), findsOneWidget);
+    expect(find.text('30'), findsOneWidget);
+    expect(await db.select(db.stockMovements).get(), isEmpty);
+    expect(find.text('유통기한 관리를 켰습니다'), findsOneWidget);
+    // 다른 기기로 전달된다.
+    final queued = await db.select(db.syncQueue).get();
+    expect(queued.map((q) => q.targetTable), ['ingredients']);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('켠 스위치를 다시 끌 수 있다', (tester) async {
+    await pumpTall(tester);
+
+    await tester.tap(find.byKey(const Key('expiryTrackedSwitch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('expiryTrackedSwitch')));
+    await tester.pumpAndSettle();
+
+    final saved = (await db.select(db.ingredients).get()).single;
+    expect(saved.isExpiryTracked, isFalse);
+    expect(switchValue(tester), isFalse);
+    expect(find.text('유통기한 관리를 껐습니다'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
   testWidgets('pops back to the previous screen after a valid disposal', (
     tester,
   ) async {

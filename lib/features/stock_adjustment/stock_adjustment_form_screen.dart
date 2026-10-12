@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format/quantity_format.dart';
 import '../../core/format/thousands_input.dart';
+import '../../core/providers/dao_providers.dart';
 import '../../core/providers/repository_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_widgets.dart';
@@ -36,6 +37,7 @@ class _StockAdjustmentFormScreenState
   MovementType _type = MovementType.disposal;
   _AdjustmentDirection _direction = _AdjustmentDirection.decrease;
   String? _errorText;
+  late bool _expiryTracked = widget.ingredient.isExpiryTracked;
 
   @override
   void dispose() {
@@ -160,6 +162,24 @@ class _StockAdjustmentFormScreenState
                       controller: _memoController,
                       decoration: const InputDecoration(labelText: '메모(선택)'),
                     ),
+                    const SizedBox(height: 4),
+                    const Divider(height: 24),
+                    // 폐기/조정(위)과 달리 저장 버튼 없이 바로 이 품목에 적용된다.
+                    SwitchListTile(
+                      key: const Key('expiryTrackedSwitch'),
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('유통기한 관리'),
+                      subtitle: const Text(
+                        '이 품목 전체에 바로 적용됩니다 (저장 버튼과 별개). '
+                        '끄면 기한이 임박 표시에서 빠지고, 이미 적은 기한은 남아 있습니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      value: _expiryTracked,
+                      onChanged: _setExpiryTracked,
+                    ),
                   ],
                 ),
               ),
@@ -174,6 +194,22 @@ class _StockAdjustmentFormScreenState
         ),
       ),
     );
+  }
+
+  /// 폐기/조정과 별개로, 이 품목의 유통기한 관리를 바로 바꾼다 (저장 버튼을 누를
+  /// 필요 없이 품목 전체에 적용되고, 적어 둔 수량·메모는 그대로 남는다).
+  Future<void> _setExpiryTracked(bool value) async {
+    await ref
+        .read(ingredientDaoProvider)
+        .updateExpiryTracked(widget.ingredient.id, value);
+    if (!mounted) return;
+    setState(() => _expiryTracked = value);
+    // 연달아 바꿔도 이전 안내 뒤에 줄을 서지 않고 바로 새 안내가 보이게 한다.
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(value ? '유통기한 관리를 켰습니다' : '유통기한 관리를 껐습니다')),
+      );
   }
 
   Future<void> _save() async {

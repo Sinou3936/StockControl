@@ -128,6 +128,37 @@ void main() {
   );
 
   test(
+    'updateExpiryTracked changes only that field and queues the row',
+    () async {
+      final id = await db.ingredientDao.insertIngredient(
+        IngredientsCompanion.insert(
+          name: '양파',
+          baseUnit: 'g',
+          purchaseUnit: '박스',
+          conversionFactor: 20000,
+          isExpiryTracked: true,
+          safetyStockQty: const Value(5000),
+        ),
+      );
+      await db.delete(db.syncQueue).go();
+
+      await db.ingredientDao.updateExpiryTracked(id, false);
+
+      final saved = (await db.ingredientDao.watchAll().first).firstWhere(
+        (i) => i.id == id,
+      );
+      expect(saved.isExpiryTracked, isFalse);
+      // 안전재고는 그대로 둔다 (다른 기기에서 막 고친 값을 덮어쓰지 않게 한 칸만 쓴다).
+      expect(saved.safetyStockQty, 5000);
+
+      final queued = await db.select(db.syncQueue).get();
+      expect(queued, hasLength(1));
+      expect(queued.single.targetTable, 'ingredients');
+      expect(queued.single.recordId, id);
+    },
+  );
+
+  test(
     'updateSettings can clear the safety stock and turn tracking on',
     () async {
       final id = await db.ingredientDao.insertIngredient(
