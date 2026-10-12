@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 서버(Supabase) 로그인과 동기화에 필요하다. debug/profile 매니페스트에는
+         있었지만 main에 없으면 릴리스 APK는 인터넷에 접속하지 못한다. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="stockcontrol"
         android:name="${applicationName}"
