@@ -25,6 +25,25 @@ void main() {
       expect(cellNumber('1,000'), 1000.0);
       expect(cellNumber('1,234.5'), 1234.5);
       expect(cellNumber('-3'), -3.0);
+      expect(cellNumber('-1,000'), -1000.0);
+    });
+
+    test('부호가 겹치거나 +가 붙은 글자는 null (--5가 5가 되지 않는다)', () {
+      expect(cellNumber('--5'), isNull);
+      expect(cellNumber('-+5'), isNull);
+      expect(cellNumber('+5'), isNull);
+    });
+
+    test('천 단위 묶음이 틀린 쉼표는 null', () {
+      expect(cellNumber('1,50'), isNull);
+      expect(cellNumber('1234,567'), isNull);
+      expect(cellNumber('1,0000'), isNull);
+    });
+
+    test("'-0'은 부호 없는 0.0 (단가가 -0.0으로 저장되지 않는다)", () {
+      expect(cellNumber('-0'), 0.0);
+      expect(cellNumber('-0')!.isNegative, isFalse);
+      expect(cellNumber(-0.0)!.isNegative, isFalse);
     });
 
     test('읽을 수 없는 값은 null (조용히 0이 되지 않는다)', () {

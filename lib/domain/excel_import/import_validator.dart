@@ -274,8 +274,8 @@ ImportValidation validateImport(
       fail('품목명이 비어 있습니다');
     } else if (sheetIngredients.containsKey(itemName)) {
       info = sheetIngredients[itemName];
-      // info가 null이면 품목 시트의 그 줄이 이미 오류다. 여기서 또 알리지 않는다.
-      if (info == null) ok = false;
+      // info가 null이면 품목 시트의 그 줄이 이미 오류다. 여기서 또 알리지 않는다
+      // (아래에서 info가 null인 줄은 계획에 넣지 않고 건너뛴다).
     } else if (existingIngredients.containsKey(itemName)) {
       info = _IngredientInfo.of(existingIngredients[itemName]!);
     } else {
@@ -306,15 +306,19 @@ ImportValidation validateImport(
     var ignoredExpiry = false;
     final expiryCell = _at(row.cells, inboundCols['유통기한']!);
     if (!cellIsBlank(expiryCell)) {
-      final value = cellDate(expiryCell);
-      if (value == null) {
-        fail('유통기한을 읽을 수 없습니다 (예: 2026-12-31)');
-      } else if (date != null && value.isBefore(date)) {
-        fail('유통기한이 입고 날짜보다 이릅니다');
-      } else if (info != null && !info.isExpiryTracked) {
+      if (info != null && !info.isExpiryTracked) {
+        // 유통기한 관리 품목이 아니면 칸을 읽지 않고 무시한다 (읽히는지, 입고
+        // 날짜보다 이른지도 보지 않는다). 오류가 아니고 경고로만 센다.
         ignoredExpiry = true;
       } else {
-        expiry = value;
+        final value = cellDate(expiryCell);
+        if (value == null) {
+          fail('유통기한을 읽을 수 없습니다 (예: 2026-12-31)');
+        } else if (date != null && value.isBefore(date)) {
+          fail('유통기한이 입고 날짜보다 이릅니다');
+        } else {
+          expiry = value;
+        }
       }
     }
 

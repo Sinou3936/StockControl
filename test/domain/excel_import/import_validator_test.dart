@@ -81,7 +81,7 @@ void main() {
       expect(v.isValid, isFalse);
     });
 
-    test('세 시트의 머리글이 다 틀리면 오류 세 개가 한 번에 나온다', () {
+    test('머리글이 하나씩 빠진 세 시트는 오류 세 개가 한 번에 나온다', () {
       final b = RawWorkbook(
         suppliers: [
           ['이름'],
@@ -141,6 +141,33 @@ void main() {
       expect(plan.newIngredients.single.safetyStockQty, 5000);
       expect(plan.inboundLines.single.baseQty, 40000);
       expect(plan.inboundLines.single.unitCost, 45000);
+    });
+
+    test('같은 머리글이 두 번 있으면 첫 번째 열이 이긴다', () {
+      final b = RawWorkbook(
+        suppliers: [kSupplierHeaders],
+        ingredients: [
+          [...kIngredientHeaders, '환산계수'],
+          ['쌀', 'g', '포', 20000, null, '아니오', 1],
+        ],
+        inbound: [kInboundHeaders],
+      );
+      final v = validate(b);
+      expect(texts(v), isEmpty);
+      expect(v.plan!.newIngredients.single.conversionFactor, 20000);
+    });
+
+    test('빈 시트는 머리글마다 열이 없다는 오류를 내고 예외 없이 끝난다', () {
+      final b = RawWorkbook(
+        suppliers: [kSupplierHeaders],
+        ingredients: [],
+        inbound: [kInboundHeaders],
+      );
+      final v = validate(b);
+      expect(texts(v), [
+        for (final h in kIngredientHeaders) "품목 시트 1번째 줄: '$h' 열이 없습니다",
+      ]);
+      expect(v.plan, isNull);
     });
   });
 
@@ -498,6 +525,19 @@ void main() {
       expect(v.plan!.inboundLines.single.supplierName, '다라마상사');
     });
 
+    test('영문 대소문자만 다른 거래처는 다른 이름이다', () {
+      final v = validate(
+        book(
+          suppliers: [
+            ['CJ', null],
+          ],
+          ingredients: [rice()],
+          inbound: [inboundRow(supplier: 'cj')],
+        ),
+      );
+      expect(texts(v), ['입고 시트 2번째 줄: 거래처 "cj"가 거래처 시트나 등록된 거래처에 없습니다']);
+    });
+
     test('대소문자가 다르면 다른 이름이다', () {
       final v = validate(
         book(
@@ -591,6 +631,20 @@ void main() {
     test('유통기한 관리가 아닌 품목의 값은 오류가 아니고 무시한다', () {
       final v = validateInbound([inboundRow(expiry: '2026-12-31')]);
       expect(v.isValid, isTrue);
+      expect(v.plan!.inboundLines.single.expiryDate, isNull);
+      expect(v.plan!.ignoredExpiryCount, 1);
+    });
+
+    test('유통기한 관리가 아닌 품목에는 읽을 수 없는 글자를 적어도 오류가 아니다', () {
+      final v = validateInbound([inboundRow(expiry: 'abc')]);
+      expect(texts(v), isEmpty);
+      expect(v.plan!.inboundLines.single.expiryDate, isNull);
+      expect(v.plan!.ignoredExpiryCount, 1);
+    });
+
+    test('유통기한 관리가 아닌 품목에는 입고 날짜보다 이른 날짜를 적어도 오류가 아니다', () {
+      final v = validateInbound([inboundRow(expiry: '2026-09-28')]);
+      expect(texts(v), isEmpty);
       expect(v.plan!.inboundLines.single.expiryDate, isNull);
       expect(v.plan!.ignoredExpiryCount, 1);
     });

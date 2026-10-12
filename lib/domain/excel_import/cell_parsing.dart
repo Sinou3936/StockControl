@@ -22,16 +22,25 @@ final _thousandsGrouped = RegExp(r'^\d{1,3}(,\d{3})+(\.\d+)?$');
 /// 음수는 그대로 돌려주고 허용 여부는 부르는 쪽이 정한다.
 /// 천 단위 쉼표는 올바른 묶음일 때만 받는다 (`1,5`는 15가 아니라 오류).
 double? cellNumber(Object? cell) {
-  if (cell is num) return cell.isFinite ? cell.toDouble() : null;
+  if (cell is num) {
+    return cell.isFinite ? _noNegativeZero(cell.toDouble()) : null;
+  }
   final text = cellText(cell);
   if (text.isEmpty) return null;
   final negative = text.startsWith('-');
   final body = negative ? text.substring(1) : text;
+  // 맨 앞 '-' 하나만 부호로 받는다. '--5', '-+5', '+5'는 읽을 수 없는 글자다.
+  if (!_startsLikeNumber.hasMatch(body)) return null;
   if (body.contains(',') && !_thousandsGrouped.hasMatch(body)) return null;
   final parsed = double.tryParse(body.replaceAll(',', ''));
   if (parsed == null || !parsed.isFinite) return null;
-  return negative ? -parsed : parsed;
+  return _noNegativeZero(negative ? -parsed : parsed);
 }
+
+final _startsLikeNumber = RegExp(r'^[\d.]');
+
+/// `-0`이 -0.0으로 저장되지 않게 한다.
+double _noNegativeZero(double value) => value == 0 ? 0.0 : value;
 
 final _dateText = RegExp(
   r'^(\d{4}|\d{2})[-/.](\d{1,2})[-/.](\d{1,2})(\s+\d{1,2}:\d{2}(:\d{2})?)?$',
