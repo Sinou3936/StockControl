@@ -30,6 +30,15 @@ Uint8List buildPurchaseOrderXlsx(PurchaseOrder order) {
     TextCellValue(order.supplier.contact ?? ''),
   ]);
 
+  // 발주일·매장·거래처·연락처의 값 칸은 B~D열(표의 수량·단위·비고 폭)로 합친다.
+  // 값이 긴 거래처 이름이나 전화번호도 잘리지 않고 같은 폭으로 보인다.
+  for (var row = 1; row <= 4; row++) {
+    sheet.merge(
+      CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row),
+      CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row),
+    );
+  }
+
   const headerRow = 5;
   sheet.appendRow([
     TextCellValue('품목'),

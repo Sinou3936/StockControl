@@ -58,6 +58,25 @@ void main() {
     expect(rows[4].take(2).map(text), ['연락처', '010-1234-5678']);
   });
 
+  test('발주일·매장·거래처·연락처의 값 칸은 B~D열로 합쳐져 있다', () {
+    final sheet = Excel.decodeBytes(buildPurchaseOrderXlsx(makeOrder()))['발주서'];
+
+    // 값이 긴 이름·전화번호여도 잘리지 않게 같은 폭으로 합친다. 제목(1행)과
+    // 품목 표(6행부터)는 합치지 않는다.
+    expect(sheet.spannedItems.toSet(), {'B2:D2', 'B3:D3', 'B4:D4', 'B5:D5'});
+  });
+
+  test('합친 뒤에도 값은 그대로 읽힌다 (연락처가 없어도 만들어진다)', () {
+    final sheet = Excel.decodeBytes(
+      buildPurchaseOrderXlsx(makeOrder(contact: null)),
+    )['발주서'];
+
+    expect(text(sheet.rows[1][1]), '2026-10-07');
+    expect(text(sheet.rows[2][1]), '울산점');
+    expect(text(sheet.rows[3][1]), '가나다상사');
+    expect(sheet.spannedItems, hasLength(4));
+  });
+
   test('품목 표에 머리글과 각 줄이 들어간다', () {
     final rows = Excel.decodeBytes(
       buildPurchaseOrderXlsx(makeOrder()),
