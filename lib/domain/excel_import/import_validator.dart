@@ -58,6 +58,30 @@ List<({int number, List<Object?> cells})> _dataRows(RawSheet sheet) {
   return rows;
 }
 
+bool _isFormula(Object? cell) =>
+    cell is String && cell.startsWith('=') && cell.trim().length > 1;
+
+/// 수식이 든 줄을 줄마다 오류 하나로 모은다. 리더는 수식 칸을 '=계산결과'로
+/// 넘기는데 그대로 쓰면 이름 앞에 '='가 붙은 채 조용히 등록되거나, 숫자 칸에서
+/// 이유를 알 수 없는 오류가 난다.
+void _checkFormulas(
+  String sheetName,
+  RawSheet sheet,
+  List<ImportError> errors,
+) {
+  for (var i = 1; i < sheet.length; i++) {
+    final column = sheet[i].indexWhere(_isFormula);
+    if (column < 0) continue;
+    errors.add(
+      ImportError(
+        sheetName,
+        i + 1,
+        '수식이 들어 있습니다 (${column + 1}번째 칸). 값만 복사해 붙여넣어 주세요',
+      ),
+    );
+  }
+}
+
 Object? _at(List<Object?> row, int column) =>
     column < row.length ? row[column] : null;
 
@@ -95,11 +119,17 @@ ImportValidation validateImport(
     return ImportValidation(plan: null, errors: errors);
   }
 
+  // 수식이 있으면 값을 믿을 수 없다. 다른 검사는 하지 않고 수식부터 고치게 한다.
+  _checkFormulas(kSuppliersSheet, book.suppliers, errors);
+  _checkFormulas(kIngredientsSheet, book.ingredients, errors);
+  _checkFormulas(kInboundSheet, book.inbound, errors);
+  if (errors.isNotEmpty) return ImportValidation(plan: null, errors: errors);
+
   // ---- 거래처
   final sheetSuppliers = <String, int>{};
   final newSuppliers = <NewSupplier>[];
   for (final row in _dataRows(book.suppliers)) {
-    final name = cellText(_at(row.cells, supplierCols['이름']!));
+    final name = cellName(_at(row.cells, supplierCols['이름']!));
     if (name.isEmpty) {
       errors.add(ImportError(kSuppliersSheet, row.number, '이름이 비어 있습니다'));
       continue;
@@ -128,7 +158,7 @@ ImportValidation validateImport(
   final sheetIngredients = <String, _IngredientInfo?>{};
   final newIngredients = <NewIngredient>[];
   for (final row in _dataRows(book.ingredients)) {
-    final name = cellText(_at(row.cells, ingredientCols['품목명']!));
+    final name = cellName(_at(row.cells, ingredientCols['품목명']!));
     if (name.isEmpty) {
       errors.add(ImportError(kIngredientsSheet, row.number, '품목명이 비어 있습니다'));
       continue;
@@ -259,7 +289,7 @@ ImportValidation validateImport(
     }
 
     // 거래처
-    final supplierName = cellText(_at(row.cells, inboundCols['거래처']!));
+    final supplierName = cellName(_at(row.cells, inboundCols['거래처']!));
     if (supplierName.isEmpty) {
       fail('거래처가 비어 있습니다');
     } else if (!sheetSuppliers.containsKey(supplierName) &&
@@ -268,7 +298,7 @@ ImportValidation validateImport(
     }
 
     // 품목
-    final itemName = cellText(_at(row.cells, inboundCols['품목명']!));
+    final itemName = cellName(_at(row.cells, inboundCols['품목명']!));
     _IngredientInfo? info;
     if (itemName.isEmpty) {
       fail('품목명이 비어 있습니다');

@@ -40,14 +40,14 @@ List<Object?> rice({Object? factor = 20000, Object? tracked = '아니오'}) => [
 /// 입고 시트 한 줄.
 List<Object?> inboundRow({
   Object? date = '2026-09-29',
-  Object? supplier = '다라마상사',
+  Object? supplier = '가나다상사',
   Object? item = '쌀',
   Object? qty = 2,
   Object? cost = 45000,
   Object? expiry,
 }) => [date, supplier, item, qty, cost, expiry];
 
-const _supplierSet = {'다라마상사'};
+const _supplierSet = {'가나다상사'};
 
 /// 쌀 품목 한 줄 + 입고 한 줄(들)로 검증한다. 거래처는 이미 등록되어 있다.
 ImportValidation validateInbound(
@@ -122,7 +122,7 @@ void main() {
       final b = RawWorkbook(
         suppliers: [
           ['연락처', '메모', '이름'],
-          ['010-1111', '무시', '다라마상사'],
+          ['010-1111', '무시', '가나다상사'],
         ],
         ingredients: [
           ['환산계수', '품목명', '기본 단위', '비고', '구매 단위', '유통기한 관리', '안전재고'],
@@ -130,13 +130,13 @@ void main() {
         ],
         inbound: [
           ['품목명', '날짜', '단가', '거래처', '수량', '유통기한'],
-          ['쌀', '2026-09-29', 45000, '다라마상사', 2, null],
+          ['쌀', '2026-09-29', 45000, '가나다상사', 2, null],
         ],
       );
       final v = validate(b);
       expect(texts(v), isEmpty);
       final plan = v.plan!;
-      expect(plan.newSuppliers.single.name, '다라마상사');
+      expect(plan.newSuppliers.single.name, '가나다상사');
       expect(plan.newSuppliers.single.contact, '010-1111');
       expect(plan.newIngredients.single.safetyStockQty, 5000);
       expect(plan.inboundLines.single.baseQty, 40000);
@@ -426,7 +426,7 @@ void main() {
       expect(line.purchaseQty, 2);
       expect(line.unitCost, 45000);
       expect(line.rowNumber, 2);
-      expect(line.supplierName, '다라마상사');
+      expect(line.supplierName, '가나다상사');
       expect(line.ingredientName, '쌀');
       expect(line.purchaseUnit, '포');
       expect(line.baseUnit, 'g');
@@ -439,14 +439,14 @@ void main() {
       final v = validate(
         book(
           suppliers: [
-            ['다라마상사', '010'],
+            ['가나다상사', '010'],
           ],
           ingredients: [rice()],
           inbound: [inboundRow()],
         ),
       );
       expect(v.isValid, isTrue);
-      expect(v.plan!.newSuppliers.single.name, '다라마상사');
+      expect(v.plan!.newSuppliers.single.name, '가나다상사');
       expect(v.plan!.inboundLines, hasLength(1));
     });
   });
@@ -507,8 +507,8 @@ void main() {
     });
 
     test('모르는 거래처 이름은 오류', () {
-      final v = validateInbound([inboundRow(supplier: '다라마상사2')]);
-      expect(texts(v), ['입고 시트 2번째 줄: 거래처 "다라마상사2"가 거래처 시트나 등록된 거래처에 없습니다']);
+      final v = validateInbound([inboundRow(supplier: '가나다상사2')]);
+      expect(texts(v), ['입고 시트 2번째 줄: 거래처 "가나다상사2"가 거래처 시트나 등록된 거래처에 없습니다']);
     });
 
     test('모르는 품목 이름은 오류', () {
@@ -517,12 +517,10 @@ void main() {
     });
 
     test('앞뒤 공백은 같은 이름으로 본다', () {
-      final v = validateInbound([
-        inboundRow(item: ' 쌀 ', supplier: ' 다라마상사 '),
-      ]);
+      final v = validateInbound([inboundRow(item: ' 쌀 ', supplier: ' 가나다상사 ')]);
       expect(v.isValid, isTrue);
       expect(v.plan!.inboundLines.single.ingredientName, '쌀');
-      expect(v.plan!.inboundLines.single.supplierName, '다라마상사');
+      expect(v.plan!.inboundLines.single.supplierName, '가나다상사');
     });
 
     test('영문 대소문자만 다른 거래처는 다른 이름이다', () {
@@ -685,6 +683,120 @@ void main() {
         ),
       );
       expect(texts(v), ['거래처 시트 4번째 줄: 이름이 비어 있습니다']);
+    });
+  });
+
+  group('수식 칸', () {
+    // 리더는 수식 칸을 '=결과글자'로 넘긴다 (읽는 쪽 테스트 참고).
+    test('품목명 칸의 수식은 이름에 = 이 붙은 채 등록되지 않고 오류가 된다', () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['=쌀', 'g', '포', 20000, null, '아니오'],
+          ],
+        ),
+      );
+      expect(texts(v), ['품목 시트 2번째 줄: 수식이 들어 있습니다 (1번째 칸). 값만 복사해 붙여넣어 주세요']);
+      expect(v.plan, isNull);
+    });
+
+    test('거래처·입고 시트의 수식도 같은 오류, 같은 줄의 칸마다 하나가 아니라 줄마다 하나', () {
+      final v = validate(
+        book(
+          suppliers: [
+            ['=가나다', '=010'],
+          ],
+          inbound: [
+            ['=A1', '=B1', '쌀', 1, null, null],
+          ],
+        ),
+      );
+      expect(texts(v), [
+        '거래처 시트 2번째 줄: 수식이 들어 있습니다 (1번째 칸). 값만 복사해 붙여넣어 주세요',
+        '입고 시트 2번째 줄: 수식이 들어 있습니다 (1번째 칸). 값만 복사해 붙여넣어 주세요',
+      ]);
+    });
+
+    test('수식 오류가 있으면 다른 줄 검사는 하지 않는다 (같은 문제가 두 번 보이지 않게)', () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['=쌀', 'g', '포', 20000, null, '아니오'],
+          ],
+          inbound: [inboundRow(qty: 0)], // 수식이 없는 줄의 다른 오류
+        ),
+        suppliers: _supplierSet,
+      );
+      expect(texts(v), ['품목 시트 2번째 줄: 수식이 들어 있습니다 (1번째 칸). 값만 복사해 붙여넣어 주세요']);
+    });
+
+    test('아래로 끌어 둔 수식의 결과가 빈 글자("=")인 줄은 빈 줄이다', () {
+      final v = validateInbound([
+        inboundRow(),
+        ['=', '=', '=', '=', '=', '='],
+      ]);
+      expect(v.isValid, isTrue);
+      expect(v.plan!.inboundLines, hasLength(1));
+    });
+
+    test('머리글 칸의 수식은 보지 않는다', () {
+      expect(validate(book()).isValid, isTrue);
+    });
+  });
+
+  group('거의 같은 이름', () {
+    test('품목 시트와 입고 시트의 이름이 NBSP·전각 공백만 달라도 같은 품목이다', () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['청양 고추', 'g', '봉', 500, null, '아니오'],
+          ],
+          inbound: [inboundRow(item: '청양　고추')],
+        ),
+        suppliers: _supplierSet,
+      );
+      expect(v.isValid, isTrue);
+      expect(v.plan!.newIngredients.single.name, '청양 고추');
+      expect(v.plan!.inboundLines.single.ingredientName, '청양 고추');
+    });
+
+    test('이미 등록된 품목 이름과 NBSP만 달라도 새 품목이 생기지 않는다', () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['청양 고추', 'g', '봉', 500, null, '아니오'],
+          ],
+        ),
+        ingredients: {
+          '청양 고추': const ExistingIngredient(
+            baseUnit: 'g',
+            purchaseUnit: '봉',
+            conversionFactor: 500,
+            isExpiryTracked: false,
+          ),
+        },
+      );
+      expect(v.isValid, isTrue);
+      expect(v.plan!.newIngredients, isEmpty);
+    });
+
+    test('거래처도 같은 규칙이고, 시트 안에서 보이지 않는 차이로 두 번 쓰면 중복 오류', () {
+      final v = validate(
+        book(
+          suppliers: [
+            ['가나다 상사', null],
+            ['가나다 상사', null],
+          ],
+        ),
+      );
+      expect(texts(v), ['거래처 시트 3번째 줄: 같은 이름이 시트 안에 두 번 있습니다 (2번째 줄과 같음)']);
+    });
+
+    test('글자가 하나라도 다르면 다른 이름이다 (조용히 합쳐지지 않는다)', () {
+      final v = validateInbound([inboundRow(item: '쌀 ')], ingredient: rice());
+      expect(v.isValid, isTrue);
+      final w = validateInbound([inboundRow(item: '쌀알')]);
+      expect(w.isValid, isFalse);
     });
   });
 

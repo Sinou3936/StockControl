@@ -90,9 +90,11 @@ class _ExcelImportScreenState extends ConsumerState<ExcelImportScreen> {
       if (!mounted) return;
       final first = result.firstDate;
       final last = result.lastDate;
+      final storeName = ref.read(selectedStoreProvider)?.name;
       setState(() {
         _resetPreview();
         _resultMessage =
+            '${storeName == null ? '' : '$storeName에 '}'
             '거래처 ${result.newSuppliers}, 품목 ${result.newIngredients}, '
             '입고 ${result.inboundCount}건을 등록했습니다'
             '${first == null || last == null ? '' : ' (${_dateText(first)} ~ ${_dateText(last)})'}';
@@ -260,10 +262,26 @@ class _ExcelImportScreenState extends ConsumerState<ExcelImportScreen> {
     final hasDuplicates = preview.duplicates.isNotEmpty;
     final canCommit = !_busy && (!hasDuplicates || _confirmedDuplicates);
 
+    final storeName = ref.watch(selectedStoreProvider)?.name;
+
     Text line(String text) => Text(
       text,
       style: const TextStyle(fontSize: 14, color: AppColors.textStrong),
     );
+
+    // 새로 만들어질 이름. 눈에 같아 보이는 이름이 새 품목으로 잘못 잡히는 것을
+    // 올리기 전에 알아챌 수 있게 한다.
+    Widget nameLine(String label, List<String> names) {
+      final shown = names.take(_kPreviewLines).join(', ');
+      final more = names.length - _kPreviewLines;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(
+          '$label: $shown${more > 0 ? ' 외 $more개' : ''}',
+          style: const TextStyle(fontSize: 13, color: AppColors.textBody),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -274,8 +292,14 @@ class _ExcelImportScreenState extends ConsumerState<ExcelImportScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SectionLabel('올리기 전에 확인하세요'),
+              // 되돌리기 기능이 없으므로 어느 매장에 올라가는지 눈에 띄게 보인다.
+              if (storeName != null) line('매장 $storeName'),
               line('새 거래처 ${plan.newSuppliers.length}'),
+              if (plan.newSuppliers.isNotEmpty)
+                nameLine('새 거래처', [for (final s in plan.newSuppliers) s.name]),
               line('새 품목 ${plan.newIngredients.length}'),
+              if (plan.newIngredients.isNotEmpty)
+                nameLine('새 품목', [for (final i in plan.newIngredients) i.name]),
               line('입고 ${plan.inboundLines.length}건'),
               line('단가 없음 ${plan.noPriceCount}건'),
               if (plan.ignoredExpiryCount > 0)

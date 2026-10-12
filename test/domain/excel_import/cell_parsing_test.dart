@@ -17,6 +17,39 @@ void main() {
     });
   });
 
+  group('normalizeName', () {
+    test('NBSP·전각 공백·탭·연속 공백은 공백 하나가 된다', () {
+      expect(normalizeName('청양 고추'), '청양 고추');
+      expect(normalizeName('쌀　20KG'), '쌀 20KG');
+      expect(normalizeName('청양  \t 고추'), '청양 고추');
+    });
+
+    test('앞뒤의 NBSP·전각 공백도 지운다', () {
+      expect(normalizeName(' 쌀　'), '쌀');
+    });
+
+    test('전각 영문·숫자·기호는 반각이 된다', () {
+      expect(normalizeName('ＡＢ１２'), 'AB12');
+      expect(normalizeName('쌀（２０ｋｇ）'), '쌀(20kg)');
+    });
+
+    test('한글과 다른 글자는 그대로 둔다 (다른 글자면 다른 이름)', () {
+      expect(normalizeName('청양고추'), '청양고추');
+      expect(normalizeName('청양고추') == normalizeName('청영고추'), isFalse);
+    });
+
+    test('cellName: 셀 값을 같은 규칙으로 읽는다', () {
+      expect(cellName(null), '');
+      expect(cellName(' 청양 고추 '), '청양 고추');
+    });
+  });
+
+  test('cellText: 결과가 빈 글자인 수식(=)은 빈칸이다', () {
+    expect(cellText('='), '');
+    expect(cellIsBlank('='), isTrue);
+    expect(cellText('=쌀'), '=쌀');
+  });
+
   group('cellNumber', () {
     test('읽히는 값', () {
       expect(cellNumber(5), 5.0);

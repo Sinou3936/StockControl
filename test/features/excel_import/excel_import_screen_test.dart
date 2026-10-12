@@ -35,13 +35,13 @@ const ulsan = Store(id: 'a', name: '울산점');
 
 Uint8List goodFile() => xlsx(
   suppliers: [
-    ['다라마상사', null],
+    ['가나다상사', null],
   ],
   ingredients: [
     ['쌀 20KG', 'g', '포', 20000, null, '아니오'],
   ],
   inbound: [
-    ['2026-09-29', '다라마상사', '쌀 20KG', 2, 45000, null],
+    ['2026-09-29', '가나다상사', '쌀 20KG', 2, 45000, null],
   ],
 );
 
@@ -170,6 +170,67 @@ void main() {
     expect(find.byKey(const Key('errorList')), findsNothing);
     // 미리보기만으로는 아무것도 저장되지 않는다.
     expect(await db.select(db.lots).get(), isEmpty);
+
+    await dispose(tester);
+  });
+
+  testWidgets('미리보기에 올릴 매장 이름과 새로 만들어질 거래처·품목 이름이 보인다', (tester) async {
+    await pump(tester);
+    await pick(tester, goodFile());
+
+    final summary = find.byKey(const Key('previewSummary'));
+    expect(
+      find.descendant(of: summary, matching: find.text('매장 울산점')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: summary, matching: find.text('새 거래처: 가나다상사')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: summary, matching: find.text('새 품목: 쌀 20KG')),
+      findsOneWidget,
+    );
+
+    await dispose(tester);
+  });
+
+  testWidgets('새 이름이 많으면 앞의 10개만 보이고 나머지는 외 N개', (tester) async {
+    await pump(tester);
+    await pick(
+      tester,
+      xlsx(
+        suppliers: [
+          for (var i = 1; i <= 12; i++) ['거래처$i', null],
+        ],
+      ),
+    );
+
+    final summary = find.byKey(const Key('previewSummary'));
+    expect(
+      find.descendant(of: summary, matching: find.textContaining('거래처10')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: summary, matching: find.textContaining('거래처11')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: summary, matching: find.textContaining('외 2개')),
+      findsOneWidget,
+    );
+
+    await dispose(tester);
+  });
+
+  testWidgets('결과 안내에도 어느 매장에 올렸는지 적힌다', (tester) async {
+    await pump(tester);
+    await pick(tester, goodFile());
+
+    await tester.tap(find.byKey(const Key('commitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('울산점에'), findsOneWidget);
 
     await dispose(tester);
   });
@@ -316,13 +377,13 @@ void main() {
       tester,
       xlsx(
         suppliers: [
-          ['다라마상사', null],
+          ['가나다상사', null],
         ],
         ingredients: [
           ['쌀', 'g', '포', 20000, null, '아니오'],
         ],
         inbound: [
-          ['2026-09-29', '다라마상사', '쌀', 2, null, '2026-10-05'],
+          ['2026-09-29', '가나다상사', '쌀', 2, null, '2026-10-05'],
         ],
       ),
     );
@@ -340,13 +401,13 @@ void main() {
       tester,
       xlsx(
         suppliers: [
-          ['다라마상사', null],
+          ['가나다상사', null],
         ],
         ingredients: [
           [longName, 'g', '포', 20000, null, '아니오'],
         ],
         inbound: [
-          ['2026-09-29', '다라마상사', longName, 2, 45000, null],
+          ['2026-09-29', '가나다상사', longName, 2, 45000, null],
         ],
       ),
     );
@@ -360,7 +421,7 @@ void main() {
         inbound: [
           [
             '2026-09-29',
-            '매우매우매우 긴 이름의 모르는 거래처 다라마상사본점',
+            '매우매우매우 긴 이름의 모르는 거래처 가나다상사본점',
             longName,
             2,
             45000,

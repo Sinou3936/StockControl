@@ -352,7 +352,7 @@ List<Object?> rice({Object? factor = 20000, Object? tracked = '아니오'}) =>
 /// 입고 시트 한 줄.
 List<Object?> inboundRow({
   Object? date = '2026-09-29',
-  Object? supplier = '다라마상사',
+  Object? supplier = '가나다상사',
   Object? item = '쌀',
   Object? qty = 2,
   Object? cost = 45000,
@@ -366,7 +366,7 @@ List<Object?> inboundRow({
   - **거래처**: 이름이 비면 `'거래처 시트 2번째 줄: 이름이 비어 있습니다'`. 같은 이름이 두 번이면 두 번째 줄에 `'같은 이름이 시트 안에 두 번 있습니다 (2번째 줄과 같음)'` (공백 차이 `'가나다 '`/`'가나다'`도 같은 이름). 이미 등록된 이름이면 `newSuppliers`에 없다. 연락처가 빈칸이면 `contact == null`.
   - **품목**: 정상 줄은 `NewIngredient`로 나온다 (`baseUnit 'g'`, `factor 20000`, `isExpiryTracked false`). 기본 단위 `'G'`는 `'g'`로 읽는다, `'kg'`는 `'기본 단위는 g, ml, ea 중 하나여야 합니다'`. 구매 단위 빈칸, 환산계수 `0`/`-1`/`'abc'`/빈칸은 `'환산계수는 0보다 큰 숫자여야 합니다'`. 안전재고: 빈칸→`null`, `0`→`null`, `5000`→5000, `'abc'`/`-1`→`'안전재고를 숫자로 적어 주세요 (비우면 알림에서 제외)'`. 유통기한 관리: `'예'`→true, `'아니오'`·빈칸→false, `'네'`→`"유통기한 관리는 '예' 또는 '아니오'로 적어 주세요"`. 시트 안 같은 이름은 오류.
   - **기존 품목**: 이름이 같고 단위·환산계수가 같으면 `newIngredients`에 없다 (안전재고·유통기한 관리는 기존 값을 쓴다). 환산계수가 다르면 `'이미 등록된 품목과 기본 단위나 환산계수가 다릅니다 (등록된 값: g, 20000)'`. 기본 단위가 다르면 같은 오류.
-  - **입고 정상**: 위 `rice()`가 파일에 있고 `inboundRow()` 한 줄 → `inboundLines.single`의 `receivedAt == DateTime(2026,9,29,9)`, `baseQty == 40000`, `purchaseQty == 2`, `unitCost == 45000`, `noPriceCount == 0`. 거래처 `'다라마상사'`는 거래처 시트에 있거나 `suppliers:`로 넘긴다.
+  - **입고 정상**: 위 `rice()`가 파일에 있고 `inboundRow()` 한 줄 → `inboundLines.single`의 `receivedAt == DateTime(2026,9,29,9)`, `baseQty == 40000`, `purchaseQty == 2`, `unitCost == 45000`, `noPriceCount == 0`. 거래처 `'가나다상사'`는 거래처 시트에 있거나 `suppliers:`로 넘긴다.
   - **입고 날짜**: 엑셀 날짜 셀(`DateTime(2026,9,29,13,30)`), `'2026-09-29'`, `'26/09/29'`가 모두 `DateTime(2026,9,29,9)`. 빈칸 `'날짜가 비어 있습니다'`, `'abc'` `'날짜를 읽을 수 없습니다 (예: 2026-09-29)'`, 오늘(`2026-10-12`)은 통과, 내일(`2026-10-13`) `'오늘 이후 날짜입니다'`.
   - **입고 거래처·품목**: 빈칸은 오류. 모르는 이름은 `'거래처 "X"가 거래처 시트나 등록된 거래처에 없습니다'` / `'품목 "X"가 품목 시트나 등록된 품목에 없습니다'`. 앞뒤 공백(`' 쌀 '`)은 같은 이름으로 본다. 대소문자·글자가 다르면(`'쌀 '` vs `'쌀2'`) 모르는 이름 오류.
   - **수량**: `0`, `-1`, `'abc'`, 빈칸, `'1,5'`, `1e12` → `'수량은 0보다 큰 숫자여야 합니다'`. `' 5 '`, `'1,000'`, `2.5`는 통과.
@@ -833,7 +833,7 @@ Uint8List buildImportTemplateXlsx() {
   guide.appendRow([for (final h in kInboundHeaders) TextCellValue(h)]);
   guide.appendRow([
     TextCellValue('2026-09-29'),
-    TextCellValue('다라마상사'),
+    TextCellValue('가나다상사'),
     TextCellValue('쌀 20KG'),
     TextCellValue('2'),
     TextCellValue('45000'),
@@ -966,9 +966,9 @@ final excelImportServiceProvider = Provider<ExcelImportService>((ref) => ExcelIm
 ```
 
 - [ ] **3-1. 실패하는 테스트를 쓴다** — `test/data/import/excel_import_service_test.dart`. 도우미: 메모리 DB(`AppDatabase(NativeDatabase.memory())`, `addTearDown(db.close)`), 매장 한 개(`db.storeDao.upsertStore(StoresCompanion.insert(id: 'a', name: '울산점'))`), 파일 바이트를 만드는 함수 `Uint8List xlsx({suppliers, ingredients, inbound})` (테스트 안에서 `Excel.createExcel()`로 세 시트에 머리글 + 줄을 `TextCellValue`/`IntCellValue`/`DateCellValue`로 써서 `encode()`; 도우미는 한 번만 만들고 모든 케이스가 쓴다). 이 테스트는 일반 `test`라서 `.first`를 써도 된다. 케이스:
-  1. **정상 저장**: 새 거래처 `다라마상사`, 새 품목 `쌀`(g, 포, 20000, 기한 관리 아니오), 입고 `2026-09-29`, 수량 2, 단가 45000. `prepare` → `validation.isValid`, `duplicates` 비어 있음. `commit` 후 DB: 거래처 1개, 품목 1개(`conversionFactor 20000`), 로트 1개(`storeId 'a'`, `unitCost 45000`, `receivedDate == DateTime(2026,9,29,9)`, `remainingQty 40000`), 입고 기록 1개(`type 'inbound'`, `quantity 40000`, `occurredAt == DateTime(2026,9,29,9)`). `ImportCommitResult`의 개수가 맞다.
+  1. **정상 저장**: 새 거래처 `가나다상사`, 새 품목 `쌀`(g, 포, 20000, 기한 관리 아니오), 입고 `2026-09-29`, 수량 2, 단가 45000. `prepare` → `validation.isValid`, `duplicates` 비어 있음. `commit` 후 DB: 거래처 1개, 품목 1개(`conversionFactor 20000`), 로트 1개(`storeId 'a'`, `unitCost 45000`, `receivedDate == DateTime(2026,9,29,9)`, `remainingQty 40000`), 입고 기록 1개(`type 'inbound'`, `quantity 40000`, `occurredAt == DateTime(2026,9,29,9)`). `ImportCommitResult`의 개수가 맞다.
   2. **재고 합계**: 위 업로드 뒤 `db.stockMovementDao`의 지난 날짜 재고(`watchStockAsOf(DateTime(2026,9,30), storeId: 'a').first`)가 40000 g 한 줄이다 (지난 날짜 조회와 이어짐).
-  3. **이미 있는 거래처·품목은 새로 만들지 않는다**: 거래처 `다라마상사`와 품목 `쌀`(같은 단위·환산계수)을 DAO로 먼저 등록하고 같은 파일을 올리면 거래처·품목 수가 그대로 1개이고 로트만 생긴다. 파일의 거래처 시트·품목 시트를 **비워 두고** 입고 시트만 채워도(기존 이름 참조) 통과한다.
+  3. **이미 있는 거래처·품목은 새로 만들지 않는다**: 거래처 `가나다상사`와 품목 `쌀`(같은 단위·환산계수)을 DAO로 먼저 등록하고 같은 파일을 올리면 거래처·품목 수가 그대로 1개이고 로트만 생긴다. 파일의 거래처 시트·품목 시트를 **비워 두고** 입고 시트만 채워도(기존 이름 참조) 통과한다.
   4. **기존 품목과 환산계수가 다르면** `prepare`의 `validation.isValid`가 false이고 `commit`은 호출하지 않는다 (오류 메시지에 `환산계수` 포함).
   5. **중복 의심**: 같은 파일을 `commit`한 뒤 다시 `prepare`하면 `duplicates.single`의 `ingredientName == '쌀'`, `rowNumber == 2`. 다음 중 하나라도 다르면 중복이 아니다 (각각 한 케이스): 매장(`storeId 'b'`로 prepare), 날짜(`2026-09-28`), 수량(3), 단가(46000), 거래처(다른 거래처), 품목(다른 품목). 파일 안에서 같은 줄이 두 번 있어도 `duplicates`는 비어 있다 (둘 다 새로 올리는 것).
   6. **전부 아니면 전무**: 계획을 직접 만들어 `commit`에 넘긴다 — 새 거래처 1개, 새 품목 1개, 입고 줄 2개 중 둘째 줄의 `ingredientName`이 계획에도 DB에도 없는 이름. `commit`이 예외(`StateError`)를 던지고, 그 뒤 DB에 거래처·품목·로트·입고 기록이 **하나도 없다** (이미 만든 거래처·품목까지 되돌려짐).

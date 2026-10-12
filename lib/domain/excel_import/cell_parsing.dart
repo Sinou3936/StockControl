@@ -1,7 +1,31 @@
+final _spaceRuns = RegExp(r'[\s 　]+');
+final _zeroWidth = RegExp(r'[​-‍﻿]');
+
+/// 눈에 같아 보이는 이름이 같은 이름으로 비교되게 다듬는다. 한컴·웹에서 복사한
+/// 글자에는 보이지 않는 차이가 흔하다: NBSP·전각 공백·탭·겹친 공백은 공백
+/// 하나로, 폭 없는 글자는 지우고, 전각 영문·숫자·기호(`ＡＢ１２`)는 반각으로 바꾼다.
+/// 한글 등 다른 글자는 그대로 둔다 (글자가 다르면 다른 이름).
+String normalizeName(String raw) {
+  final buffer = StringBuffer();
+  for (final unit in raw.replaceAll(_zeroWidth, '').runes) {
+    final isFullWidth = unit >= 0xFF01 && unit <= 0xFF5E;
+    buffer.writeCharCode(isFullWidth ? unit - 0xFEE0 : unit);
+  }
+  return buffer.toString().replaceAll(_spaceRuns, ' ').trim();
+}
+
+/// 이름 칸을 [normalizeName] 규칙으로 읽는다. 비어 있으면 ''.
+String cellName(Object? cell) => normalizeName(cellText(cell));
+
 /// 셀 값을 앞뒤 공백 없는 글자로. 비어 있으면 ''.
 String cellText(Object? cell) {
   if (cell == null) return '';
-  if (cell is String) return cell.trim();
+  if (cell is String) {
+    final text = cell.trim();
+    // 결과가 빈 글자인 수식은 리더가 '='로 넘긴다 (아래로 끌어 둔 `=IF(..,"",..)`).
+    // 비어 보이는 칸이므로 빈칸으로 본다.
+    return text == '=' ? '' : text;
+  }
   if (cell is DateTime) {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${cell.year}-${two(cell.month)}-${two(cell.day)}';

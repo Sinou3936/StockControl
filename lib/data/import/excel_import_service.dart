@@ -1,7 +1,8 @@
-﻿import 'package:drift/drift.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/database_provider.dart';
+import '../../domain/excel_import/cell_parsing.dart';
 import '../../domain/excel_import/excel_import_types.dart';
 import '../../domain/excel_import/import_validator.dart';
 import '../../domain/stock_by_date.dart';
@@ -60,8 +61,8 @@ class ExcelImportService {
   /// 파일을 읽어 검증하고, 오류가 없으면 기존 입고와 겹치는 줄을 찾는다.
   /// 엑셀 파일이 아니거나 시트가 없으면 [ImportFileException]. DB는 바꾸지 않는다.
   ///
-  /// 파일의 이름은 앞뒤 공백을 지우고 읽으므로, 비교하는 DB 쪽 이름도 같은
-  /// 규칙으로 지운다 (DB에 `" 쌀 "`이 있어도 파일의 `쌀`과 같은 품목이다).
+  /// 파일의 이름은 [normalizeName] 규칙으로 읽으므로, 비교하는 DB 쪽 이름도 같은
+  /// 규칙으로 다듬는다 (DB에 `" 쌀 "`이나 NBSP가 든 이름이 있어도 같은 품목이다).
   Future<ImportPreview> prepare({
     required Uint8List bytes,
     required String storeId,
@@ -74,7 +75,7 @@ class ExcelImportService {
     final existingIngredients = <String, ExistingIngredient>{};
     for (final i in ingredients) {
       existingIngredients.putIfAbsent(
-        i.name.trim(),
+        normalizeName(i.name),
         () => ExistingIngredient(
           baseUnit: i.baseUnit,
           purchaseUnit: i.purchaseUnit,
@@ -86,7 +87,7 @@ class ExcelImportService {
 
     final validation = validateImport(
       book,
-      existingSupplierNames: {for (final s in suppliers) s.name.trim()},
+      existingSupplierNames: {for (final s in suppliers) normalizeName(s.name)},
       existingIngredients: existingIngredients,
       now: now ?? DateTime.now(),
     );
@@ -115,11 +116,11 @@ class ExcelImportService {
 
     final supplierIds = <String, int>{};
     for (final s in suppliers) {
-      supplierIds.putIfAbsent(s.name.trim(), () => s.id);
+      supplierIds.putIfAbsent(normalizeName(s.name), () => s.id);
     }
     final ingredientIds = <String, int>{};
     for (final i in ingredients) {
-      ingredientIds.putIfAbsent(i.name.trim(), () => i.id);
+      ingredientIds.putIfAbsent(normalizeName(i.name), () => i.id);
     }
 
     final lots =
@@ -181,11 +182,11 @@ class ExcelImportService {
     return _db.transaction(() async {
       final supplierIds = <String, int>{};
       for (final s in await _db.select(_db.suppliers).get()) {
-        supplierIds.putIfAbsent(s.name.trim(), () => s.id);
+        supplierIds.putIfAbsent(normalizeName(s.name), () => s.id);
       }
       final ingredientIds = <String, int>{};
       for (final i in await _db.select(_db.ingredients).get()) {
-        ingredientIds.putIfAbsent(i.name.trim(), () => i.id);
+        ingredientIds.putIfAbsent(normalizeName(i.name), () => i.id);
       }
 
       for (final s in plan.newSuppliers) {

@@ -48,7 +48,7 @@ Uint8List buildImportTemplateXlsx() {
   guide.appendRow([for (final h in kInboundHeaders) TextCellValue(h)]);
   guide.appendRow([
     TextCellValue('2026-09-29'),
-    TextCellValue('다라마상사'),
+    TextCellValue('가나다상사'),
     TextCellValue('쌀 20KG'),
     TextCellValue('2'),
     TextCellValue('45000'),

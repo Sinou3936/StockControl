@@ -133,7 +133,7 @@ void main() {
     final bytes = _build({
       kSuppliersSheet: {
         ..._headers(kSupplierHeaders),
-        (1, 0): TextCellValue('다라'),
+        (1, 0): TextCellValue('가나다'),
       },
       kIngredientsSheet: {
         ..._headers(kIngredientHeaders),
@@ -146,7 +146,7 @@ void main() {
       kInboundSheet: {
         ..._headers(kInboundHeaders),
         (1, 0): const DateCellValue(year: 2026, month: 9, day: 29),
-        (1, 1): TextCellValue('다라'),
+        (1, 1): TextCellValue('가나다'),
         (1, 2): TextCellValue('쌀'),
         (1, 3): const IntCellValue(2),
         (1, 4): const IntCellValue(45000),
@@ -158,7 +158,7 @@ void main() {
           hour: 13,
           minute: 30,
         ),
-        (2, 1): TextCellValue('다라'),
+        (2, 1): TextCellValue('가나다'),
         (2, 2): TextCellValue('쌀'),
         (2, 3): const DoubleCellValue(1.5),
       },
@@ -217,7 +217,7 @@ void main() {
     final bytes = _build({
       kSuppliersSheet: {
         ..._headers(kSupplierHeaders),
-        (1, 0): TextCellValue('다라'),
+        (1, 0): TextCellValue('가나다'),
       },
       kIngredientsSheet: {
         ..._headers(kIngredientHeaders),
@@ -230,7 +230,7 @@ void main() {
         ..._headers(kInboundHeaders),
         // 날짜 칸과 수량 칸에 시간만 있는 셀을 둔다.
         (1, 0): const TimeCellValue(hour: 9, minute: 30),
-        (1, 1): TextCellValue('다라'),
+        (1, 1): TextCellValue('가나다'),
         (1, 2): TextCellValue('쌀'),
         (1, 3): const TimeCellValue(hour: 9, minute: 30),
       },
@@ -264,14 +264,14 @@ void main() {
       plain,
       '<si><t xml:space="preserve">리치자리표시</t></si>',
       '<si>'
-          '<r><rPr><b/></rPr><t>대</t></r>'
-          '<r><t>현</t></r>'
+          '<r><rPr><b/></rPr><t>가</t></r>'
+          '<r><t>나다</t></r>'
           '</si>',
     );
 
     final book = readImportWorkbook(bytes);
 
-    expect(book.suppliers[1][0], '다라');
+    expect(book.suppliers[1][0], '가나다');
   });
 
   test('시트가 빠진 파일은 빠진 시트와 파일에 있는 시트 이름을 알려 준다', () {
@@ -333,7 +333,7 @@ void main() {
     final bytes = _build({
       kSuppliersSheet: {
         ..._headers(kSupplierHeaders),
-        (1, 0): TextCellValue('다라'),
+        (1, 0): TextCellValue('가나다'),
       },
       kIngredientsSheet: {
         ..._headers(kIngredientHeaders),
@@ -345,12 +345,12 @@ void main() {
       kInboundSheet: {
         ..._headers(kInboundHeaders),
         (1, 0): const DateCellValue(year: 2026, month: 9, day: 29),
-        (1, 1): TextCellValue('다라'),
+        (1, 1): TextCellValue('가나다'),
         (1, 2): TextCellValue('쌀'),
         (1, 3): const IntCellValue(2),
         // 엑셀 3번째 줄 (rowIndex 2)은 비워 둔다.
         (3, 0): const DateCellValue(year: 2026, month: 9, day: 30),
-        (3, 1): TextCellValue('다라'),
+        (3, 1): TextCellValue('가나다'),
         (3, 2): TextCellValue('쌀'),
       },
     });

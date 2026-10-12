@@ -31,12 +31,12 @@ void main() {
     Object? date = '2026-09-29',
     Object? qty = 2,
     Object? cost = 45000,
-    Object? supplier = '다라마상사',
+    Object? supplier = '가나다상사',
     Object? item = '쌀',
   }) => xlsx(
     suppliers: [
-      ['다라마상사', null],
-      ['가나다상사', '010-1234-5678'],
+      ['가나다상사', null],
+      ['마바사상회', '010-1234-5678'],
     ],
     ingredients: [riceRow],
     inbound: [
@@ -78,9 +78,9 @@ void main() {
     expect(result.lastDate, DateTime(2026, 9, 29));
 
     final suppliers = await db.select(db.suppliers).get();
-    expect(suppliers.map((s) => s.name), containsAll(['다라마상사', '가나다상사']));
+    expect(suppliers.map((s) => s.name), containsAll(['가나다상사', '마바사상회']));
     expect(
-      suppliers.firstWhere((s) => s.name == '가나다상사').contact,
+      suppliers.firstWhere((s) => s.name == '마바사상회').contact,
       '010-1234-5678',
     );
 
@@ -116,9 +116,43 @@ void main() {
     expect(before, isEmpty);
   });
 
+  test('DB 이름에 NBSP·겹친 공백이 있어도 같은 이름이면 새로 만들지 않는다', () async {
+    await db.supplierDao.insertSupplier(
+      SuppliersCompanion.insert(name: '가나다 상사'),
+    );
+    await db.ingredientDao.insertIngredient(
+      IngredientsCompanion.insert(
+        name: '청양  고추',
+        baseUnit: 'g',
+        purchaseUnit: '봉',
+        conversionFactor: 500,
+        isExpiryTracked: false,
+      ),
+    );
+
+    final bytes = xlsx(
+      ingredients: [
+        ['청양 고추', 'g', '봉', 500, null, '아니오'],
+      ],
+      inbound: [
+        ['2026-09-29', '가나다 상사', '청양 고추', 1, 1000, null],
+      ],
+    );
+    final preview = await service.prepare(bytes: bytes, storeId: 'a', now: now);
+
+    expect(preview.validation.errors, isEmpty);
+    expect(preview.validation.plan!.newSuppliers, isEmpty);
+    expect(preview.validation.plan!.newIngredients, isEmpty);
+
+    await service.commit(plan: preview.validation.plan!, storeId: 'a');
+    expect(await db.select(db.suppliers).get(), hasLength(1));
+    expect(await db.select(db.ingredients).get(), hasLength(1));
+    expect(await db.select(db.lots).get(), hasLength(1));
+  });
+
   test('이미 있는 거래처·품목은 새로 만들지 않고 시트를 비워도 이름으로 연결된다', () async {
     final supplierId = await db.supplierDao.insertSupplier(
-      SuppliersCompanion.insert(name: '다라마상사'),
+      SuppliersCompanion.insert(name: '가나다상사'),
     );
     final ingredientId = await db.ingredientDao.insertIngredient(
       IngredientsCompanion.insert(
@@ -132,7 +166,7 @@ void main() {
 
     final bytes = xlsx(
       inbound: [
-        ['2026-09-29', '다라마상사', '쌀', 2, 45000, null],
+        ['2026-09-29', '가나다상사', '쌀', 2, 45000, null],
       ],
     );
     final result = await upload(bytes);
@@ -148,7 +182,7 @@ void main() {
 
   test('DB 이름에 앞뒤 공백이 있어도 파일의 같은 이름과 연결된다', () async {
     await db.supplierDao.insertSupplier(
-      SuppliersCompanion.insert(name: ' 다라마상사 '),
+      SuppliersCompanion.insert(name: ' 가나다상사 '),
     );
     await db.ingredientDao.insertIngredient(
       IngredientsCompanion.insert(
@@ -163,7 +197,7 @@ void main() {
     final preview = await service.prepare(
       bytes: xlsx(
         inbound: [
-          ['2026-09-29', '다라마상사', '쌀', 2, 45000, null],
+          ['2026-09-29', '가나다상사', '쌀', 2, 45000, null],
         ],
       ),
       storeId: 'a',
@@ -217,7 +251,7 @@ void main() {
       expect(preview.validation.isValid, isTrue);
       final duplicate = preview.duplicates.single;
       expect(duplicate.ingredientName, '쌀');
-      expect(duplicate.supplierName, '다라마상사');
+      expect(duplicate.supplierName, '가나다상사');
       expect(duplicate.rowNumber, 2);
     });
 
@@ -245,12 +279,12 @@ void main() {
       await upload(riceFile()); // 9월 29일에 2포
       final bytes = xlsx(
         suppliers: [
-          ['다라마상사', null],
+          ['가나다상사', null],
         ],
         ingredients: [riceRow],
         inbound: [
-          ['2026-09-28', '다라마상사', '쌀', 2, 45000, null],
-          ['2026-09-29', '다라마상사', '쌀', 2, 45000, null],
+          ['2026-09-28', '가나다상사', '쌀', 2, 45000, null],
+          ['2026-09-29', '가나다상사', '쌀', 2, 45000, null],
         ],
       );
 
@@ -273,20 +307,20 @@ void main() {
     });
 
     test('거래처가 다르면 중복이 아니다', () async {
-      expect(await second(riceFile(supplier: '가나다상사')), isEmpty);
+      expect(await second(riceFile(supplier: '마바사상회')), isEmpty);
     });
 
     test('품목이 다르면 중복이 아니다', () async {
       final bytes = xlsx(
         suppliers: [
-          ['다라마상사', null],
+          ['가나다상사', null],
         ],
         ingredients: [
           ['쌀', 'g', '포', 20000, null, '아니오'],
           ['보리', 'g', '포', 20000, null, '아니오'],
         ],
         inbound: [
-          ['2026-09-29', '다라마상사', '보리', 2, 45000, null],
+          ['2026-09-29', '가나다상사', '보리', 2, 45000, null],
         ],
       );
       expect(await second(bytes), isEmpty);
@@ -295,12 +329,12 @@ void main() {
     test('파일 안의 같은 줄끼리는 중복으로 세지 않는다', () async {
       final bytes = xlsx(
         suppliers: [
-          ['다라마상사', null],
+          ['가나다상사', null],
         ],
         ingredients: [riceRow],
         inbound: [
-          ['2026-09-29', '다라마상사', '쌀', 2, 45000, null],
-          ['2026-09-29', '다라마상사', '쌀', 2, 45000, null],
+          ['2026-09-29', '가나다상사', '쌀', 2, 45000, null],
+          ['2026-09-29', '가나다상사', '쌀', 2, 45000, null],
         ],
       );
 
@@ -389,7 +423,7 @@ void main() {
       for (var i = 0; i < 300; i++)
         [
           DateTime(2026, 9, 1 + i % 10),
-          '다라마상사',
+          '가나다상사',
           '품목${i % 5}',
           1 + i,
           1000,
@@ -398,7 +432,7 @@ void main() {
     ];
     final bytes = xlsx(
       suppliers: [
-        ['다라마상사', null],
+        ['가나다상사', null],
       ],
       ingredients: [
         for (var k = 0; k < 5; k++) ['품목$k', 'g', '박스', 1000, null, '아니오'],
@@ -445,15 +479,15 @@ void main() {
   test('유통기한 관리 품목은 유통기한이 로트에 들어가고 아닌 품목은 무시된다', () async {
     final bytes = xlsx(
       suppliers: [
-        ['다라마상사', null],
+        ['가나다상사', null],
       ],
       ingredients: [
         ['우유', 'ml', '팩', 1000, null, '예'],
         riceRow,
       ],
       inbound: [
-        ['2026-09-29', '다라마상사', '우유', 2, 3000, '2026-10-05'],
-        ['2026-09-29', '다라마상사', '쌀', 2, 45000, '2026-10-05'],
+        ['2026-09-29', '가나다상사', '우유', 2, 3000, '2026-10-05'],
+        ['2026-09-29', '가나다상사', '쌀', 2, 45000, '2026-10-05'],
       ],
     );
 
