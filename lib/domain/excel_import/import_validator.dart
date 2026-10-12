@@ -1,0 +1,362 @@
+import '../stock_by_date.dart';
+import 'cell_parsing.dart';
+import 'excel_import_types.dart';
+
+const _baseUnits = {'g', 'ml', 'ea'};
+
+class _IngredientInfo {
+  const _IngredientInfo({
+    required this.baseUnit,
+    required this.purchaseUnit,
+    required this.conversionFactor,
+    required this.isExpiryTracked,
+  });
+
+  factory _IngredientInfo.of(ExistingIngredient e) => _IngredientInfo(
+    baseUnit: e.baseUnit,
+    purchaseUnit: e.purchaseUnit,
+    conversionFactor: e.conversionFactor,
+    isExpiryTracked: e.isExpiryTracked,
+  );
+
+  final String baseUnit;
+  final String purchaseUnit;
+  final double conversionFactor;
+  final bool isExpiryTracked;
+}
+
+/// 머리글 이름 → 열 위치. 빠진 머리글이 있으면 [errors]에 더하고 null.
+Map<String, int>? _headerColumns(
+  String sheetName,
+  RawSheet sheet,
+  List<String> required,
+  List<ImportError> errors,
+) {
+  final header = sheet.isEmpty ? const <Object?>[] : sheet.first;
+  final columns = <String, int>{};
+  for (var i = 0; i < header.length; i++) {
+    columns.putIfAbsent(cellText(header[i]), () => i);
+  }
+  var complete = true;
+  for (final name in required) {
+    if (!columns.containsKey(name)) {
+      errors.add(ImportError(sheetName, 1, "'$name' 열이 없습니다"));
+      complete = false;
+    }
+  }
+  return complete ? columns : null;
+}
+
+/// 머리글 아래의 데이터 줄. 완전히 빈 줄은 건너뛰고, 줄 번호는 엑셀 번호(머리글이 1).
+List<({int number, List<Object?> cells})> _dataRows(RawSheet sheet) {
+  final rows = <({int number, List<Object?> cells})>[];
+  for (var i = 1; i < sheet.length; i++) {
+    final cells = sheet[i];
+    if (cells.every(cellIsBlank)) continue;
+    rows.add((number: i + 1, cells: cells));
+  }
+  return rows;
+}
+
+Object? _at(List<Object?> row, int column) =>
+    column < row.length ? row[column] : null;
+
+String _num(double value) => value == value.truncateToDouble()
+    ? value.toInt().toString()
+    : value.toString();
+
+/// 파일의 내용을 검사해 저장할 계획을 만든다. 오류는 한 번에 모두 모은다.
+ImportValidation validateImport(
+  RawWorkbook book, {
+  required Set<String> existingSupplierNames,
+  required Map<String, ExistingIngredient> existingIngredients,
+  required DateTime now,
+}) {
+  final errors = <ImportError>[];
+  final supplierCols = _headerColumns(
+    kSuppliersSheet,
+    book.suppliers,
+    kSupplierHeaders,
+    errors,
+  );
+  final ingredientCols = _headerColumns(
+    kIngredientsSheet,
+    book.ingredients,
+    kIngredientHeaders,
+    errors,
+  );
+  final inboundCols = _headerColumns(
+    kInboundSheet,
+    book.inbound,
+    kInboundHeaders,
+    errors,
+  );
+  if (supplierCols == null || ingredientCols == null || inboundCols == null) {
+    return ImportValidation(plan: null, errors: errors);
+  }
+
+  // ---- 거래처
+  final sheetSuppliers = <String, int>{};
+  final newSuppliers = <NewSupplier>[];
+  for (final row in _dataRows(book.suppliers)) {
+    final name = cellText(_at(row.cells, supplierCols['이름']!));
+    if (name.isEmpty) {
+      errors.add(ImportError(kSuppliersSheet, row.number, '이름이 비어 있습니다'));
+      continue;
+    }
+    final first = sheetSuppliers[name];
+    if (first != null) {
+      errors.add(
+        ImportError(
+          kSuppliersSheet,
+          row.number,
+          '같은 이름이 시트 안에 두 번 있습니다 ($first번째 줄과 같음)',
+        ),
+      );
+      continue;
+    }
+    sheetSuppliers[name] = row.number;
+    if (existingSupplierNames.contains(name)) continue;
+    final contact = cellText(_at(row.cells, supplierCols['연락처']!));
+    newSuppliers.add(
+      NewSupplier(name: name, contact: contact.isEmpty ? null : contact),
+    );
+  }
+
+  // ---- 품목. 줄이 틀렸어도 이름은 등록해 둔다 (값은 null): 입고 줄에 "품목
+  // 없음" 오류가 따로 생겨 같은 문제가 두 번 보이는 것을 막는다.
+  final sheetIngredients = <String, _IngredientInfo?>{};
+  final newIngredients = <NewIngredient>[];
+  for (final row in _dataRows(book.ingredients)) {
+    final name = cellText(_at(row.cells, ingredientCols['품목명']!));
+    if (name.isEmpty) {
+      errors.add(ImportError(kIngredientsSheet, row.number, '품목명이 비어 있습니다'));
+      continue;
+    }
+    if (sheetIngredients.containsKey(name)) {
+      errors.add(
+        ImportError(kIngredientsSheet, row.number, '같은 이름이 시트 안에 두 번 있습니다'),
+      );
+      continue;
+    }
+
+    var ok = true;
+    void fail(String message) {
+      errors.add(ImportError(kIngredientsSheet, row.number, message));
+      ok = false;
+    }
+
+    final baseUnit = cellText(
+      _at(row.cells, ingredientCols['기본 단위']!),
+    ).toLowerCase();
+    if (!_baseUnits.contains(baseUnit)) fail('기본 단위는 g, ml, ea 중 하나여야 합니다');
+
+    final purchaseUnit = cellText(_at(row.cells, ingredientCols['구매 단위']!));
+    if (purchaseUnit.isEmpty) fail('구매 단위가 비어 있습니다');
+
+    final factor = cellNumber(_at(row.cells, ingredientCols['환산계수']!));
+    if (factor == null || factor <= 0) fail('환산계수는 0보다 큰 숫자여야 합니다');
+
+    double? safety;
+    final safetyCell = _at(row.cells, ingredientCols['안전재고']!);
+    if (!cellIsBlank(safetyCell)) {
+      final value = cellNumber(safetyCell);
+      if (value == null || value < 0) {
+        fail('안전재고를 숫자로 적어 주세요 (비우면 알림에서 제외)');
+      } else if (value > 0) {
+        safety = value;
+      }
+    }
+
+    final trackedText = cellText(_at(row.cells, ingredientCols['유통기한 관리']!));
+    var tracked = false;
+    if (trackedText == '예') {
+      tracked = true;
+    } else if (trackedText.isNotEmpty && trackedText != '아니오') {
+      fail("유통기한 관리는 '예' 또는 '아니오'로 적어 주세요");
+    }
+
+    if (!ok) {
+      sheetIngredients[name] = null;
+      continue;
+    }
+
+    final existing = existingIngredients[name];
+    if (existing != null) {
+      if (existing.baseUnit != baseUnit ||
+          (existing.conversionFactor - factor!).abs() > 1e-9) {
+        errors.add(
+          ImportError(
+            kIngredientsSheet,
+            row.number,
+            '이미 등록된 품목과 기본 단위나 환산계수가 다릅니다 '
+            '(등록된 값: ${existing.baseUnit}, ${_num(existing.conversionFactor)})',
+          ),
+        );
+        sheetIngredients[name] = null;
+      } else {
+        sheetIngredients[name] = _IngredientInfo.of(existing);
+      }
+      continue;
+    }
+
+    sheetIngredients[name] = _IngredientInfo(
+      baseUnit: baseUnit,
+      purchaseUnit: purchaseUnit,
+      conversionFactor: factor!,
+      isExpiryTracked: tracked,
+    );
+    newIngredients.add(
+      NewIngredient(
+        name: name,
+        baseUnit: baseUnit,
+        purchaseUnit: purchaseUnit,
+        conversionFactor: factor,
+        safetyStockQty: safety,
+        isExpiryTracked: tracked,
+      ),
+    );
+  }
+
+  // ---- 입고
+  final inboundRows = _dataRows(book.inbound);
+  if (inboundRows.length > kMaxInboundRows) {
+    errors.add(
+      ImportError(
+        kInboundSheet,
+        1,
+        '입고 줄이 ${_withComma(kMaxInboundRows)}개를 넘습니다 (${inboundRows.length}개)',
+      ),
+    );
+    return ImportValidation(plan: null, errors: errors);
+  }
+
+  final today = dayStart(now);
+  final lines = <InboundLine>[];
+  var noPriceCount = 0;
+  var ignoredExpiryCount = 0;
+
+  for (final row in inboundRows) {
+    var ok = true;
+    void fail(String message) {
+      errors.add(ImportError(kInboundSheet, row.number, message));
+      ok = false;
+    }
+
+    // 날짜
+    DateTime? date;
+    final dateCell = _at(row.cells, inboundCols['날짜']!);
+    if (cellIsBlank(dateCell)) {
+      fail('날짜가 비어 있습니다');
+    } else {
+      date = cellDate(dateCell);
+      if (date == null) {
+        fail('날짜를 읽을 수 없습니다 (예: 2026-09-29)');
+      } else if (date.isAfter(today)) {
+        fail('오늘 이후 날짜입니다');
+        date = null;
+      }
+    }
+
+    // 거래처
+    final supplierName = cellText(_at(row.cells, inboundCols['거래처']!));
+    if (supplierName.isEmpty) {
+      fail('거래처가 비어 있습니다');
+    } else if (!sheetSuppliers.containsKey(supplierName) &&
+        !existingSupplierNames.contains(supplierName)) {
+      fail('거래처 "$supplierName"가 거래처 시트나 등록된 거래처에 없습니다');
+    }
+
+    // 품목
+    final itemName = cellText(_at(row.cells, inboundCols['품목명']!));
+    _IngredientInfo? info;
+    if (itemName.isEmpty) {
+      fail('품목명이 비어 있습니다');
+    } else if (sheetIngredients.containsKey(itemName)) {
+      info = sheetIngredients[itemName];
+      // info가 null이면 품목 시트의 그 줄이 이미 오류다. 여기서 또 알리지 않는다.
+      if (info == null) ok = false;
+    } else if (existingIngredients.containsKey(itemName)) {
+      info = _IngredientInfo.of(existingIngredients[itemName]!);
+    } else {
+      fail('품목 "$itemName"이(가) 품목 시트나 등록된 품목에 없습니다');
+    }
+
+    // 수량
+    final qty = cellNumber(_at(row.cells, inboundCols['수량']!));
+    if (qty == null || qty <= 0 || qty > 1e9) fail('수량은 0보다 큰 숫자여야 합니다');
+
+    // 단가
+    var unitCost = 0.0;
+    var noPrice = false;
+    final costCell = _at(row.cells, inboundCols['단가']!);
+    if (cellIsBlank(costCell)) {
+      noPrice = true;
+    } else {
+      final value = cellNumber(costCell);
+      if (value == null || value < 0) {
+        fail('단가를 0 이상의 숫자로 적어 주세요 (비우면 0)');
+      } else {
+        unitCost = value;
+      }
+    }
+
+    // 유통기한
+    DateTime? expiry;
+    var ignoredExpiry = false;
+    final expiryCell = _at(row.cells, inboundCols['유통기한']!);
+    if (!cellIsBlank(expiryCell)) {
+      final value = cellDate(expiryCell);
+      if (value == null) {
+        fail('유통기한을 읽을 수 없습니다 (예: 2026-12-31)');
+      } else if (date != null && value.isBefore(date)) {
+        fail('유통기한이 입고 날짜보다 이릅니다');
+      } else if (info != null && !info.isExpiryTracked) {
+        ignoredExpiry = true;
+      } else {
+        expiry = value;
+      }
+    }
+
+    if (!ok || info == null || date == null || qty == null) continue;
+    if (noPrice) noPriceCount++;
+    if (ignoredExpiry) ignoredExpiryCount++;
+    lines.add(
+      InboundLine(
+        rowNumber: row.number,
+        receivedAt: DateTime(date.year, date.month, date.day, 9),
+        supplierName: supplierName,
+        ingredientName: itemName,
+        purchaseQty: qty,
+        purchaseUnit: info.purchaseUnit,
+        baseUnit: info.baseUnit,
+        conversionFactor: info.conversionFactor,
+        baseQty: qty * info.conversionFactor,
+        unitCost: unitCost,
+        expiryDate: expiry,
+      ),
+    );
+  }
+
+  if (errors.isNotEmpty) return ImportValidation(plan: null, errors: errors);
+  return ImportValidation(
+    plan: ImportPlan(
+      newSuppliers: newSuppliers,
+      newIngredients: newIngredients,
+      inboundLines: lines,
+      noPriceCount: noPriceCount,
+      ignoredExpiryCount: ignoredExpiryCount,
+    ),
+    errors: errors,
+  );
+}
+
+String _withComma(int n) {
+  final s = n.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(s[i]);
+  }
+  return buffer.toString();
+}
