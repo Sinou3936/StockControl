@@ -294,6 +294,7 @@ ImportValidation validateImport(
   final lines = <InboundLine>[];
   var noPriceCount = 0;
   var ignoredExpiryCount = 0;
+  var defaultedDateCount = 0;
 
   for (final row in inboundRows) {
     var ok = true;
@@ -302,11 +303,15 @@ ImportValidation validateImport(
       ok = false;
     }
 
-    // 날짜
+    // 날짜. 비워 두면 올리는 날(오늘)이다: 그날 들어온 물량을 그날 올리는 평소
+    // 사용에서 날짜 열을 채우지 않아도 되게 한다. 몇 줄이 그렇게 채워졌는지는
+    // 미리보기에서 알려 준다.
     DateTime? date;
+    var dateDefaulted = false;
     final dateCell = _at(row.cells, inboundCols['날짜']!);
     if (cellIsBlank(dateCell)) {
-      fail('날짜가 비어 있습니다');
+      date = today;
+      dateDefaulted = true;
     } else {
       date = cellDate(dateCell);
       if (date == null) {
@@ -384,10 +389,14 @@ ImportValidation validateImport(
     if (!ok || info == null || date == null || qty == null) continue;
     if (noPrice) noPriceCount++;
     if (ignoredExpiry) ignoredExpiryCount++;
+    if (dateDefaulted) defaultedDateCount++;
+    // 날짜만 있으므로 그날 09:00으로 기록하되, 오전 9시 전에 오늘 줄을 올리면
+    // 미래 시각이 되므로 지금으로 한다.
+    final nineAm = DateTime(date.year, date.month, date.day, 9);
     lines.add(
       InboundLine(
         rowNumber: row.number,
-        receivedAt: DateTime(date.year, date.month, date.day, 9),
+        receivedAt: nineAm.isAfter(now) ? now : nineAm,
         supplierName: supplierName,
         ingredientName: itemName,
         purchaseQty: qty,
@@ -410,6 +419,8 @@ ImportValidation validateImport(
       noPriceCount: noPriceCount,
       ignoredExpiryCount: ignoredExpiryCount,
       restoredPhoneCount: restoredPhoneCount,
+      defaultedDateCount: defaultedDateCount,
+      defaultDate: today,
     ),
     errors: errors,
   );

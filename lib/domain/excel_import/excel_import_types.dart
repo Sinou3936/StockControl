@@ -102,7 +102,7 @@ class InboundLine {
 
   final int rowNumber;
 
-  /// 입고 날짜의 09:00 (로컬).
+  /// 입고 날짜의 09:00 (로컬). 지금보다 뒤면(오전 9시 전에 오늘 줄을 올릴 때) 지금.
   final DateTime receivedAt;
   final String supplierName;
   final String ingredientName;
@@ -128,6 +128,8 @@ class ImportPlan {
     required this.noPriceCount,
     required this.ignoredExpiryCount,
     this.restoredPhoneCount = 0,
+    this.defaultedDateCount = 0,
+    this.defaultDate,
   });
 
   final List<NewSupplier> newSuppliers;
@@ -142,6 +144,12 @@ class ImportPlan {
 
   /// 엑셀이 숫자로 저장해 앞의 0이 사라진 연락처에 0을 되살린 새 거래처 수.
   final int restoredPhoneCount;
+
+  /// 날짜 칸이 비어 올리는 날로 채운 입고 줄 수.
+  final int defaultedDateCount;
+
+  /// 비어 있는 날짜를 채운 날(올리는 날, 자정). 채운 줄이 없어도 값이 있다.
+  final DateTime? defaultDate;
 
   /// 입고 날짜 범위 (자정). 입고가 없으면 null.
   DateTime? get firstDate => _dates(inboundLines).firstOrNull;

@@ -101,6 +101,20 @@ void main() {
     expect(movement.occurredAt, DateTime(2026, 9, 29, 9));
   });
 
+  test('날짜 칸을 비우면 올린 날(오늘)로 입고된다', () async {
+    final preview = await service.prepare(
+      bytes: riceFile(date: null),
+      storeId: 'a',
+      now: now,
+    );
+    expect(preview.validation.errors, isEmpty);
+    expect(preview.validation.plan!.defaultedDateCount, 1);
+
+    await service.commit(plan: preview.validation.plan!, storeId: 'a');
+    final lot = (await db.select(db.lots).get()).single;
+    expect(lot.receivedDate, DateTime(2026, 10, 12, 9));
+  });
+
   test('올린 입고가 지난 날짜 재고 조회에 그날 끝 수량으로 나온다', () async {
     await upload(riceFile());
 

@@ -419,6 +419,41 @@ void main() {
     await dispose(tester);
   });
 
+  testWidgets('날짜 칸이 비어 오늘로 들어가는 줄 수를 알려 주고, 없으면 그 줄은 안 보인다', (tester) async {
+    await pump(tester);
+    await pick(
+      tester,
+      xlsx(
+        suppliers: [
+          ['가나다상사', null],
+        ],
+        ingredients: [
+          ['쌀', 'g', '포', 20000, null, '아니오'],
+        ],
+        inbound: [
+          [null, '가나다상사', '쌀', 2, 45000, null],
+          ['2026-09-29', '가나다상사', '쌀', 3, 45000, null],
+        ],
+      ),
+    );
+
+    final today = DateTime.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    expect(
+      find.text(
+        '날짜 칸이 비어 오늘(${today.year}-${two(today.month)}-${two(today.day)})로 등록 1건',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('anotherFileButton')));
+    await tester.pump();
+    await pick(tester, goodFile());
+    expect(find.textContaining('날짜 칸이 비어'), findsNothing);
+
+    await dispose(tester);
+  });
+
   testWidgets('연락처를 되살린 곳이 없으면 그 줄은 보이지 않는다', (tester) async {
     await pump(tester);
     await pick(tester, goodFile());

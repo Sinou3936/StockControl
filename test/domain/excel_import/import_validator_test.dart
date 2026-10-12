@@ -585,9 +585,50 @@ void main() {
       expect(v.plan!.inboundLines, hasLength(3));
     });
 
-    test('빈칸은 오류', () {
-      final v = validateInbound([inboundRow(date: null)]);
-      expect(texts(v), ['입고 시트 2번째 줄: 날짜가 비어 있습니다']);
+    test('빈칸은 올리는 날(오늘)로 등록하고 몇 건인지 센다', () {
+      final v = validateInbound([
+        inboundRow(date: null),
+        inboundRow(date: ' '),
+        inboundRow(date: '2026-09-29'),
+      ]);
+      expect(v.isValid, isTrue);
+      final plan = v.plan!;
+      expect(plan.inboundLines.map((l) => l.receivedAt), [
+        DateTime(2026, 10, 12, 9),
+        DateTime(2026, 10, 12, 9),
+        DateTime(2026, 9, 29, 9),
+      ]);
+      // 적힌 날짜는 그대로이고, 비어서 채운 줄만 센다.
+      expect(plan.defaultedDateCount, 2);
+      expect(plan.defaultDate, DateTime(2026, 10, 12));
+    });
+
+    test('날짜가 다 적혀 있으면 채운 줄은 0건', () {
+      final v = validateInbound([inboundRow(date: '2026-09-29')]);
+      expect(v.plan!.defaultedDateCount, 0);
+    });
+
+    test('오전 9시 전에 올려도 입고 시각이 지금보다 뒤로 가지 않는다', () {
+      final early = DateTime(2026, 10, 12, 8, 30);
+      final v = validateImport(
+        book(
+          ingredients: [rice()],
+          inbound: [
+            inboundRow(date: null),
+            inboundRow(date: '2026-10-12'),
+          ],
+        ),
+        existingSupplierNames: _supplierSet,
+        existingIngredients: const {},
+        now: early,
+      );
+      expect(v.isValid, isTrue);
+      expect(v.plan!.inboundLines.map((l) => l.receivedAt), [early, early]);
+    });
+
+    test('날짜가 비어도 다른 칸의 오류는 그대로 알려 준다 (그 줄은 건수에 안 센다)', () {
+      final v = validateInbound([inboundRow(date: null, qty: 0)]);
+      expect(texts(v), ['입고 시트 2번째 줄: 수량은 0보다 큰 숫자여야 합니다']);
     });
 
     test('읽을 수 없는 글자는 오류', () {
