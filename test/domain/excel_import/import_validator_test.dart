@@ -110,7 +110,7 @@ void main() {
         ],
         ingredients: [
           ['품목명', '기본 단위', '구매 단위', '안전재고', '유통기한 관리'],
-          ['쌀', 'kg', null, 'abc', '네'],
+          ['쌀', 'oz', null, 'abc', '네'],
         ],
         inbound: [kInboundHeaders, inboundRow(qty: 0)],
       );
@@ -260,15 +260,48 @@ void main() {
       expect(v.plan!.newIngredients.single.baseUnit, 'g');
     });
 
-    test("기본 단위 'kg'는 오류", () {
+    test("기본 단위 'kg'와 'L'도 받는다 (표기는 대소문자와 상관없이 정해진 모양으로)", () {
       final v = validate(
         book(
           ingredients: [
-            ['쌀', 'kg', '포', 20000, null, '아니오'],
+            ['쌀', ' KG ', '포', 20, null, '아니오'],
+            ['우유', 'l', '팩', 1, null, '아니오'],
           ],
         ),
       );
-      expect(texts(v), ['품목 시트 2번째 줄: 기본 단위는 g, ml, ea 중 하나여야 합니다']);
+      expect(v.isValid, isTrue);
+      expect(v.plan!.newIngredients.map((i) => i.baseUnit), ['kg', 'L']);
+    });
+
+    test("허용하지 않는 기본 단위는 오류 (목록을 알려 준다)", () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['쌀', 'oz', '포', 20000, null, '아니오'],
+          ],
+        ),
+      );
+      expect(texts(v), ['품목 시트 2번째 줄: 기본 단위는 g, kg, ml, L, ea 중 하나여야 합니다']);
+    });
+
+    test("이미 등록된 품목은 단위를 대소문자로 다르게 적어도 같은 단위로 본다", () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['우유', 'l', '팩', 1, null, '아니오'],
+          ],
+        ),
+        ingredients: {
+          '우유': const ExistingIngredient(
+            baseUnit: 'L',
+            purchaseUnit: '팩',
+            conversionFactor: 1,
+            isExpiryTracked: false,
+          ),
+        },
+      );
+      expect(v.isValid, isTrue);
+      expect(v.plan!.newIngredients, isEmpty);
     });
 
     test('구매 단위 빈칸은 오류', () {

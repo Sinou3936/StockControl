@@ -56,6 +56,10 @@ void main() {
       expect(hasLine(['환산계수', '20000']), isTrue);
     });
 
+    test('기본 단위는 g, kg, ml, L, ea 중 하나', () {
+      expect(hasLine(['5.', '기본 단위는 g, kg, ml, L, ea 중 하나입니다']), isTrue);
+    });
+
     test('유통기한 관리는 예 또는 아니오, 단가를 비우면 0', () {
       expect(hasLine(['예 또는 아니오', '비우면 아니오']), isTrue);
       expect(hasLine(['단가를 비우면 0']), isTrue);

@@ -193,7 +193,7 @@ class IngredientListScreen extends ConsumerWidget {
                             .map(
                               (unit) => DropdownMenuItem(
                                 value: unit,
-                                child: Text(unit.name),
+                                child: Text(unit.label),
                               ),
                             )
                             .toList(),
@@ -230,7 +230,7 @@ class IngredientListScreen extends ConsumerWidget {
                     inputFormatters: const [ThousandsSeparatorFormatter()],
                     decoration: InputDecoration(
                       labelText: '안전재고 (선택)',
-                      suffixText: selectedBaseUnit.name,
+                      suffixText: selectedBaseUnit.label,
                       errorText: safetyStockError,
                     ),
                     onChanged: (_) {

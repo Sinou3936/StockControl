@@ -1,8 +1,7 @@
+import '../base_unit.dart';
 import '../stock_by_date.dart';
 import 'cell_parsing.dart';
 import 'excel_import_types.dart';
-
-const _baseUnits = {'g', 'ml', 'ea'};
 
 class _IngredientInfo {
   const _IngredientInfo({
@@ -176,10 +175,12 @@ ImportValidation validateImport(
       ok = false;
     }
 
-    final baseUnit = cellText(
-      _at(row.cells, ingredientCols['기본 단위']!),
-    ).toLowerCase();
-    if (!_baseUnits.contains(baseUnit)) fail('기본 단위는 g, ml, ea 중 하나여야 합니다');
+    // `KG`, `l`처럼 적어도 정해진 표기(`kg`, `L`)로 맞춘다.
+    final parsedUnit = parseBaseUnit(
+      cellText(_at(row.cells, ingredientCols['기본 단위']!)),
+    );
+    if (parsedUnit == null) fail('기본 단위는 $kBaseUnitList 중 하나여야 합니다');
+    final baseUnit = parsedUnit?.label ?? '';
 
     final purchaseUnit = cellText(_at(row.cells, ingredientCols['구매 단위']!));
     if (purchaseUnit.isEmpty) fail('구매 단위가 비어 있습니다');

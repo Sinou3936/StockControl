@@ -402,6 +402,29 @@ void main() {
     await disposeScreen(tester);
   });
 
+  testWidgets('신규 등록에서 기본 단위로 kg와 L를 고를 수 있고 그 표기로 저장된다', (tester) async {
+    await openAddDialogAndFill(tester, safety: '');
+
+    // 단위 목록을 열어 kg를 고른다. 안전재고 칸의 단위 표시도 따라 바뀐다.
+    await tester.tap(find.text('g').first);
+    await tester.pumpAndSettle();
+    expect(find.text('kg'), findsWidgets);
+    expect(find.text('L'), findsOneWidget);
+    await tester.tap(find.text('kg').last);
+    await tester.pumpAndSettle();
+    expect(find.text('kg'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(TextButton, '저장'));
+    await tester.pumpAndSettle();
+
+    final saved = (await db.select(db.ingredients).get()).firstWhere(
+      (i) => i.name == '당근',
+    );
+    expect(saved.baseUnit, 'kg');
+
+    await disposeScreen(tester);
+  });
+
   testWidgets('신규 등록의 안전재고 칸에 기본 단위가 보인다', (tester) async {
     await openAddDialogAndFill(tester, safety: '');
 
