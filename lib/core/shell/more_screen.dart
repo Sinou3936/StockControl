@@ -8,6 +8,7 @@ import '../providers/sync_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_widgets.dart';
 import 'auth_add_staff_route.dart';
+import 'excel_import_route.dart';
 import 'store_management_route.dart';
 
 class MoreScreen extends ConsumerWidget {
@@ -55,6 +56,12 @@ class MoreScreen extends ConsumerWidget {
                     icon: Icons.person_add_outlined,
                     title: '직원 추가',
                     onTap: () => pushAddStaffScreen(context),
+                  ),
+                if (isOwner)
+                  _MenuTile(
+                    icon: Icons.upload_file_outlined,
+                    title: '엑셀 업로드',
+                    onTap: () => pushExcelImportScreen(context),
                   ),
               ],
             ),

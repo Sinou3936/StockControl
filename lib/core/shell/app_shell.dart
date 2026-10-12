@@ -12,6 +12,7 @@ import '../providers/shortage_providers.dart';
 import '../providers/sync_providers.dart';
 import '../theme/app_theme.dart';
 import 'auth_add_staff_route.dart';
+import 'excel_import_route.dart';
 import 'more_screen.dart';
 import 'store_management_route.dart';
 
@@ -62,6 +63,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                 pushStoreManagementScreen(context);
                 return;
               }
+              if (isOwner && index == 8) {
+                pushExcelImportScreen(context);
+                return;
+              }
               setState(() => _selectedIndex = index);
             },
             labelType: NavigationRailLabelType.all,
@@ -99,6 +104,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 const NavigationRailDestination(
                   icon: Icon(Icons.store_mall_directory_outlined),
                   label: Text('매장 관리'),
+                ),
+              if (isOwner)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.upload_file_outlined),
+                  label: Text('엑셀 업로드'),
                 ),
             ],
             trailing: Expanded(
