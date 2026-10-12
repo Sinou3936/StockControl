@@ -84,6 +84,8 @@ void _checkFormulas(
 /// 엑셀은 숫자로 친 전화번호(01012345678)의 앞 0을 파일에 저장하기 전에 이미
 /// 지운다. 숫자 칸이고 9~10자리(휴대폰 10자리, 지역번호 9~10자리)이면 앞에 0이
 /// 있었던 번호로 본다. 8자리는 1588-1234 같은 대표번호일 수 있어 추측하지 않는다.
+final _onlyNumber = RegExp(r'^[\d.,\s]+$');
+
 bool _isPhoneMissingZero(Object? cell) {
   if (cell is! num || !cell.isFinite || cell != cell.truncateToDouble()) {
     return false;
@@ -200,7 +202,16 @@ ImportValidation validateImport(
     final baseUnit = parsedUnit?.label ?? '';
 
     final purchaseUnit = cellText(_at(row.cells, ingredientCols['구매 단위']!));
-    if (purchaseUnit.isEmpty) fail('구매 단위가 비어 있습니다');
+    if (purchaseUnit.isEmpty) {
+      fail('구매 단위가 비어 있습니다');
+    } else if (_onlyNumber.hasMatch(purchaseUnit)) {
+      // 구매 단위는 EA·포·박스 같은 이름이다. 숫자만 있으면 환산계수나 수량을
+      // 한 칸 옆에 적은 것이라, 그대로 등록되면 발주서 단위 칸에 숫자가 찍힌다.
+      fail(
+        '구매 단위에 숫자가 적혀 있습니다. EA, 포, 박스처럼 단위 이름을 적어 주세요 '
+        '(몇 개인지는 환산계수 칸)',
+      );
+    }
 
     final factor = cellNumber(_at(row.cells, ingredientCols['환산계수']!));
     if (factor == null || factor <= 0) fail('환산계수는 0보다 큰 숫자여야 합니다');

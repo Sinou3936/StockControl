@@ -56,6 +56,18 @@ void main() {
       expect(hasLine(['환산계수', '20000']), isTrue);
     });
 
+    test('품목 시트 칸 설명: 구매 단위는 이름, 환산계수는 숫자', () {
+      expect(hasLine(['10.', '구매 단위', '단위 이름', '숫자만 적지 마세요', '환산계수']), isTrue);
+    });
+
+    test('품목 시트 예시 줄이 안내 시트에 있다 (데이터 시트가 아니라)', () {
+      expect(hasLine(['품목 시트 예시']), isTrue);
+      expect(guideLines, containsAll(kIngredientHeaders));
+      // 쌀 20kg 포대와 낱개 품목(구매 단위 EA, 환산계수 1) 두 가지.
+      expect(guideLines, containsAll(['쌀 20KG', 'g', '포', '20000']));
+      expect(guideLines, containsAll(['목장갑', 'ea', 'EA', '1']));
+    });
+
     test('기본 단위는 g, kg, ml, L, ea 중 하나', () {
       expect(hasLine(['5.', '기본 단위는 g, kg, ml, L, ea 중 하나입니다']), isTrue);
     });

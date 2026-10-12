@@ -40,6 +40,7 @@ Uint8List buildImportTemplateXlsx() {
     '7. 오류가 하나라도 있으면 아무것도 저장되지 않습니다. 미리보기에서 줄 번호와 이유를 알려 줍니다.',
     '8. 수식(=...)이 든 칸은 읽을 수 없습니다. 값으로 붙여넣어 주세요.',
     "9. 연락처는 010-1234-5678처럼 '-'를 넣어 문자로 적어 주세요 (숫자로만 적으면 앞의 0이 사라질 수 있습니다).",
+    '10. 품목 시트의 칸: 기본 단위는 재고를 세는 단위, 구매 단위는 살 때 부르는 단위 이름(EA, 포, 박스), 환산계수는 구매 단위 1개가 기본 단위로 몇 개인지 하는 숫자입니다. 구매 단위에 숫자만 적지 마세요.',
     '',
     '입고 시트 예시',
   ];
@@ -54,6 +55,25 @@ Uint8List buildImportTemplateXlsx() {
     TextCellValue('2'),
     TextCellValue('45000'),
     TextCellValue(''),
+  ]);
+  guide.appendRow([TextCellValue('')]);
+  guide.appendRow([TextCellValue('품목 시트 예시')]);
+  guide.appendRow([for (final h in kIngredientHeaders) TextCellValue(h)]);
+  guide.appendRow([
+    TextCellValue('쌀 20KG'),
+    TextCellValue('g'),
+    TextCellValue('포'),
+    TextCellValue('20000'),
+    TextCellValue('5000'),
+    TextCellValue('아니오'),
+  ]);
+  guide.appendRow([
+    TextCellValue('목장갑'),
+    TextCellValue('ea'),
+    TextCellValue('EA'),
+    TextCellValue('1'),
+    TextCellValue(''),
+    TextCellValue('아니오'),
   ]);
   guide
       .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))

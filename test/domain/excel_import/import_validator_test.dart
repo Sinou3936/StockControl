@@ -355,6 +355,41 @@ void main() {
       expect(v.plan!.newIngredients, isEmpty);
     });
 
+    for (final unit in <Object?>[10, '10', '2.5', ' 100 ']) {
+      test('구매 단위에 숫자($unit)만 적으면 오류 (칸을 잘못 채운 것)', () {
+        final v = validate(
+          book(
+            ingredients: [
+              ['감자튀김', 'g', unit, 2500, null, '아니오'],
+            ],
+          ),
+        );
+        expect(texts(v), [
+          '품목 시트 2번째 줄: 구매 단위에 숫자가 적혀 있습니다. '
+              'EA, 포, 박스처럼 단위 이름을 적어 주세요 (몇 개인지는 환산계수 칸)',
+        ]);
+        expect(v.plan, isNull);
+      });
+    }
+
+    test('숫자가 섞여도 단위 이름이면 받는다 (10KG, 2.5kg 박스)', () {
+      final v = validate(
+        book(
+          ingredients: [
+            ['감자튀김', 'g', '10KG', 10000, null, '아니오'],
+            ['쌈무', 'g', '2.8kg팩', 2800, null, '아니오'],
+            ['목장갑', 'ea', 'EA', 1, null, '아니오'],
+          ],
+        ),
+      );
+      expect(v.isValid, isTrue);
+      expect(v.plan!.newIngredients.map((i) => i.purchaseUnit), [
+        '10KG',
+        '2.8kg팩',
+        'EA',
+      ]);
+    });
+
     test('구매 단위 빈칸은 오류', () {
       final v = validate(
         book(
