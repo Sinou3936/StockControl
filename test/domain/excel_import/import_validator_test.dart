@@ -27,6 +27,8 @@ ImportValidation validate(
 
 List<String> texts(ImportValidation v) => v.errors.map((e) => e.text).toList();
 
+typedef ValidationPhones = ({List<String?> contacts, int restored});
+
 /// 품목 시트 한 줄: 쌀, g, 포, 20000, 안전재고 없음, 예(기한 관리)
 List<Object?> rice({Object? factor = 20000, Object? tracked = '아니오'}) => [
   '쌀',
@@ -178,6 +180,55 @@ void main() {
       expect(v.plan!.inboundLines, isEmpty);
       expect(v.plan!.newSuppliers, isEmpty);
       expect(v.plan!.newIngredients, isEmpty);
+    });
+  });
+
+  group('연락처 앞자리 0', () {
+    // 엑셀은 숫자로 친 전화번호의 앞 0을 파일에 저장하기 전에 이미 지운다.
+    // 9~10자리 숫자 칸은 앞에 0이 있었던 전화번호로 보고 되살린다.
+    ValidationPhones phones(List<Object?> contacts) {
+      final v = validate(
+        book(
+          suppliers: [
+            for (var i = 0; i < contacts.length; i++) ['거래처$i', contacts[i]],
+          ],
+        ),
+      );
+      expect(v.isValid, isTrue);
+      return (
+        contacts: [for (final s in v.plan!.newSuppliers) s.contact],
+        restored: v.plan!.restoredPhoneCount,
+      );
+    }
+
+    test('숫자 칸 1012345678(휴대폰)과 212345678(서울)에 0을 붙인다', () {
+      final r = phones([1012345678, 212345678]);
+      expect(r.contacts, ['01012345678', '0212345678']);
+      expect(r.restored, 2);
+    });
+
+    test('문자로 적힌 번호, 대시가 든 번호는 손대지 않는다', () {
+      final r = phones(['01012345678', '010-1234-5678', '1012345678']);
+      expect(r.contacts, ['01012345678', '010-1234-5678', '1012345678']);
+      expect(r.restored, 0);
+    });
+
+    test('8자리 숫자(1588-1234 같은 대표번호)나 너무 긴 숫자는 추측하지 않는다', () {
+      final r = phones([15881234, 12345678901]);
+      expect(r.contacts, ['15881234', '12345678901']);
+      expect(r.restored, 0);
+    });
+
+    test('이미 등록된 거래처의 연락처는 쓰지 않으므로 세지 않는다', () {
+      final v = validate(
+        book(
+          suppliers: [
+            ['가나다', 1012345678],
+          ],
+        ),
+        suppliers: {'가나다'},
+      );
+      expect(v.plan!.restoredPhoneCount, 0);
     });
   });
 

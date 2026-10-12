@@ -304,6 +304,8 @@ class _ExcelImportScreenState extends ConsumerState<ExcelImportScreen> {
               line('단가 없음 ${plan.noPriceCount}건'),
               if (plan.ignoredExpiryCount > 0)
                 line('유통기한 무시 ${plan.ignoredExpiryCount}건'),
+              if (plan.restoredPhoneCount > 0)
+                line('연락처 앞에 0을 붙인 곳 ${plan.restoredPhoneCount}건'),
               if (first != null && last != null)
                 line('입고 날짜 ${_dateText(first)} ~ ${_dateText(last)}'),
             ],

@@ -127,6 +127,7 @@ class ImportPlan {
     required this.inboundLines,
     required this.noPriceCount,
     required this.ignoredExpiryCount,
+    this.restoredPhoneCount = 0,
   });
 
   final List<NewSupplier> newSuppliers;
@@ -138,6 +139,9 @@ class ImportPlan {
 
   /// 유통기한 관리가 아닌 품목인데 유통기한이 적혀 있어 무시한 줄 수.
   final int ignoredExpiryCount;
+
+  /// 엑셀이 숫자로 저장해 앞의 0이 사라진 연락처에 0을 되살린 새 거래처 수.
+  final int restoredPhoneCount;
 
   /// 입고 날짜 범위 (자정). 입고가 없으면 null.
   DateTime? get firstDate => _dates(inboundLines).firstOrNull;

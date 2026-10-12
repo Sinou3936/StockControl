@@ -394,6 +394,40 @@ void main() {
     await dispose(tester);
   });
 
+  testWidgets('숫자로 저장돼 0이 사라진 연락처는 되살리고 몇 건인지 알려 준다', (tester) async {
+    await pump(tester);
+    await pick(
+      tester,
+      xlsx(
+        suppliers: [
+          ['가나다상사', 1012345678],
+          ['라마바상사', '010-1111-2222'],
+        ],
+      ),
+    );
+
+    expect(find.text('연락처 앞에 0을 붙인 곳 1건'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('commitButton')));
+    await tester.pumpAndSettle();
+    final contacts = {
+      for (final s in await db.select(db.suppliers).get()) s.name: s.contact,
+    };
+    expect(contacts['가나다상사'], '01012345678');
+    expect(contacts['라마바상사'], '010-1111-2222');
+
+    await dispose(tester);
+  });
+
+  testWidgets('연락처를 되살린 곳이 없으면 그 줄은 보이지 않는다', (tester) async {
+    await pump(tester);
+    await pick(tester, goodFile());
+
+    expect(find.textContaining('연락처 앞에 0'), findsNothing);
+
+    await dispose(tester);
+  });
+
   testWidgets('폭 320에서 긴 이름과 긴 오류 문구가 넘치지 않는다', (tester) async {
     const longName = '아주아주아주 긴 이름의 품목 20KG(햅쌀,국내산)(특등급)';
     await pump(tester, width: 320);

@@ -81,6 +81,17 @@ void _checkFormulas(
   }
 }
 
+/// 엑셀은 숫자로 친 전화번호(01012345678)의 앞 0을 파일에 저장하기 전에 이미
+/// 지운다. 숫자 칸이고 9~10자리(휴대폰 10자리, 지역번호 9~10자리)이면 앞에 0이
+/// 있었던 번호로 본다. 8자리는 1588-1234 같은 대표번호일 수 있어 추측하지 않는다.
+bool _isPhoneMissingZero(Object? cell) {
+  if (cell is! num || !cell.isFinite || cell != cell.truncateToDouble()) {
+    return false;
+  }
+  final digits = cell.toInt().toString();
+  return digits.length >= 9 && digits.length <= 10;
+}
+
 Object? _at(List<Object?> row, int column) =>
     column < row.length ? row[column] : null;
 
@@ -127,6 +138,7 @@ ImportValidation validateImport(
   // ---- 거래처
   final sheetSuppliers = <String, int>{};
   final newSuppliers = <NewSupplier>[];
+  var restoredPhoneCount = 0;
   for (final row in _dataRows(book.suppliers)) {
     final name = cellName(_at(row.cells, supplierCols['이름']!));
     if (name.isEmpty) {
@@ -146,7 +158,12 @@ ImportValidation validateImport(
     }
     sheetSuppliers[name] = row.number;
     if (existingSupplierNames.contains(name)) continue;
-    final contact = cellText(_at(row.cells, supplierCols['연락처']!));
+    final contactCell = _at(row.cells, supplierCols['연락처']!);
+    var contact = cellText(contactCell);
+    if (_isPhoneMissingZero(contactCell)) {
+      contact = '0$contact';
+      restoredPhoneCount++;
+    }
     newSuppliers.add(
       NewSupplier(name: name, contact: contact.isEmpty ? null : contact),
     );
@@ -381,6 +398,7 @@ ImportValidation validateImport(
       inboundLines: lines,
       noPriceCount: noPriceCount,
       ignoredExpiryCount: ignoredExpiryCount,
+      restoredPhoneCount: restoredPhoneCount,
     ),
     errors: errors,
   );
